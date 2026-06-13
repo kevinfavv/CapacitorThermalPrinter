@@ -655,17 +655,22 @@ catch (e) {
 
 ## Plan d'implémentation par phases
 
-| Phase | Contenu | État du squelette |
-|---|---|---|
-| **1** | Scaffold plugin, types TS, registry d'adapters, store imprimante par défaut, **ESC/POS via Wi-Fi TCP 9100** | ✅ fonctionnel |
-| **2** | **Bluetooth classique Android** (SPP) pour ESC/POS | ✅ transport + scanner fournis |
-| **3** | **SDK Epson + Star** | 🔌 adapters stubs + pseudo-code |
-| **4** | **iOS** : Wi-Fi TCP + SDK Star/Epson | ✅ TCP / 🔌 SDK stubs |
-| **5** | **Brother + Zebra** | 🔌 adapters stubs + pseudo-code |
-| **6** | Statut avancé, monitoring, reconnexion intelligente, logs/diagnostics | ✅ logs + events / 🔌 monitor stubs |
-| **+** | **`printText` stylé** (ESC/POS texte/QR/code-barres) + **events de job** | ✅ ESC/POS / 🔌 SDK builders |
+Légende : ✅ fait & vérifiable (TS/transports/logique plugin) · ✅◷ implémenté, **à valider sur device** (code natif SDK non compilé dans ce dépôt) · 🟡 partiel.
 
-Voir [`ROADMAP.md`](ROADMAP.md) pour le détail de ce qu'il reste à faire.
+| Phase | Contenu | État |
+|---|---|---|
+| **1** | Scaffold plugin, types TS, registry d'adapters, store imprimante par défaut, **ESC/POS via Wi-Fi TCP 9100** | ✅ |
+| **2** | **Bluetooth classique Android** (SPP) pour ESC/POS | ✅ |
+| **3** | **SDK Star** (auto-download Maven/SPM, appels typés) **+ Epson** (Android réflexion / iOS `canImport`) | ✅ Star · ✅◷ Epson |
+| **4** | **iOS** : Wi-Fi TCP + SDK Star/Epson ; **BLE via SDK MFi** (pas de GATT générique exposé) | ✅ |
+| **5** | **Brother + Zebra** (Android réflexion / iOS `canImport` ; Brother iOS via pod) | ✅◷ |
+| **6** | **Monitoring** (`start/stopStatusMonitor`) + **reconnexion backoff** + **reprise après hold** + logs/events | ✅ |
+| **+** | **Transports Android** : **BLE GATT** (MTU, allowlist UUID) + **USB host** (bulk OUT) | ✅◷ |
+| **+** | **`printText` stylé** : ESC/POS natif + **Star** natif + **Epson Android** natif ; **Brother/Zebra/Epson-iOS → repli image** (`TextRasterizer`) | ✅ |
+| **+** | **`getActiveSdks()`** (SDK actifs au runtime) + **events de job** | ✅ |
+| **+** | **Tests** : TS ~94 % · coverage connexion SDK via **faux SDK** (Epson) + JaCoCo · contrat de réflexion | ✅ TS · 🟡 natif partiel |
+
+Voir [`ROADMAP.md`](ROADMAP.md) pour le détail et [`docs/TESTING_SDK.md`](docs/TESTING_SDK.md) pour la stratégie de tests.
 
 ## Exemple complet
 
