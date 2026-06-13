@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "experimentalDecorators": true,
+    "declaration": true,
+    "lib": ["dom", "es2017"],
+    "module": "esnext",
+    "moduleResolution": "node",
+    "noEmitOnError": true,
+    "strict": true,
+    "strictNullChecks": true,
+    "outDir": "dist/esm",
+    "sourceMap": true,
+    "inlineSources": true,
+    "target": "es2017"
+  },
+  "include": ["src"]
+}

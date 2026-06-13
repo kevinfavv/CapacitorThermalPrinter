@@ -1,0 +1,22 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# Android
+android/build/
+android/.gradle/
+android/local.properties
+android/libs/*.aar
+android/libs/*.jar
+.idea/
+*.iml
+
+# iOS
+ios/Pods/
+ios/build/
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+
+# Vendor SDK (ne jamais committer les SDK propriétaires)
+**/vendor-sdk/

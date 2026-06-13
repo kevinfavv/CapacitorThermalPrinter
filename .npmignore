@@ -1,0 +1,28 @@
+# Sources non publiées (seul dist/ est livré pour le JS)
+/src/
+/example-app/
+/docs/
+/node_modules/
+/.github/
+
+# Artefacts de build natifs
+/android/build/
+/android/.gradle/
+/android/libs/*.aar
+/android/libs/*.jar
+/ios/Pods/
+/ios/build/
+**/*.xcworkspace
+**/*.xcuserstate
+
+# Config dev
+tsconfig.json
+rollup.config.mjs
+.eslintrc*
+.prettier*
+.editorconfig
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
