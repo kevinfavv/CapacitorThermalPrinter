@@ -4,11 +4,13 @@ import type {
   ConnectOptions,
   DiscoverOptions,
   PrintImageOptions,
+  PrintTextOptions,
 } from './core/options';
 import type {
   DiscoveredPrinter,
   PrinterProfile,
   PrinterStatus,
+  PrintJobStatus,
   PrintResult,
 } from './core/models';
 
@@ -24,15 +26,21 @@ export interface DiscoveryCompleteEvent {
   failedSources?: string[];
 }
 
-/** Payload de changement de statut (monitoring, Phase 6). */
+/** Payload de changement de statut imprimante (connexion, papier, capot). */
 export interface StatusChangeEvent {
   status: PrinterStatus;
+}
+
+/** Payload de changement d'état d'un job d'impression. */
+export interface PrintJobStatusEvent {
+  job: PrintJobStatus;
 }
 
 export type ThermalPrinterEvent =
   | 'printerFound'
   | 'discoveryComplete'
-  | 'statusChange';
+  | 'statusChange'
+  | 'printJobStatus';
 
 /** Entrée du journal de diagnostic (ring-buffer natif). */
 export interface DebugLogEntry {
@@ -82,8 +90,19 @@ export interface ThermalPrinterPlugin {
   /**
    * Imprime une image. Gère reconnexion auto, redimensionnement, binarisation,
    * dithering, conversion adapter et envoi. Voir flux détaillé dans le README.
+   *
+   * La promesse se résout quand l'impression physique est terminée (best-effort
+   * selon transport/SDK — voir README "Fin d'impression / await").
    */
   printImage(options: PrintImageOptions): Promise<PrintResult>;
+
+  /**
+   * Imprime un tableau d'items texte stylés (+ QR/code-barres/feed/cut/image).
+   * Voir les types `PrintItem` / `TextStyle` et le tableau de styles dans le README.
+   *
+   * La promesse se résout quand l'impression physique est terminée (best-effort).
+   */
+  printText(options: PrintTextOptions): Promise<PrintResult>;
 
   /** Lit le statut temps réel (si supporté par l'adapter/transport). */
   getPrinterStatus(options: { printerId?: string }): Promise<PrinterStatus>;
@@ -110,6 +129,10 @@ export interface ThermalPrinterPlugin {
   addListener(
     eventName: 'statusChange',
     listener: (event: StatusChangeEvent) => void,
+  ): Promise<PluginListenerHandle>;
+  addListener(
+    eventName: 'printJobStatus',
+    listener: (event: PrintJobStatusEvent) => void,
   ): Promise<PluginListenerHandle>;
 
   removeAllListeners(): Promise<void>;

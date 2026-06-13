@@ -41,6 +41,19 @@ class ThermalPrinterPlugin : Plugin() {
 
     override fun load() {
         engine = ThermalPrinterEngine(context)
+        // Relaye les états de job vers le JS (event printJobStatus).
+        engine.onJobUpdate = { u ->
+            val job = JSObject()
+                .put("jobId", u.jobId)
+                .put("printerId", u.printerId)
+                .put("state", u.state)
+                .put("updatedAt", System.currentTimeMillis())
+            u.holdReason?.let { job.put("holdReason", it) }
+            u.progress?.let { job.put("progress", it) }
+            u.errorCode?.let { job.put("errorCode", it.name) }
+            u.message?.let { job.put("message", it) }
+            notifyListeners("printJobStatus", JSObject().put("job", job))
+        }
         Logger.log("plugin", "loaded")
     }
 
@@ -129,7 +142,8 @@ class ThermalPrinterPlugin : Plugin() {
             ?: throw PrinterException(com.resto.thermalprinter.model.ErrorCode.PRINTER_NOT_FOUND, "printerId requis")
         val timeout = (call.getInt("timeoutMs")?.toLong()) ?: 10000L
         val force = call.getString("forceAdapter")?.let { com.resto.thermalprinter.model.AdapterId.from(it) }
-        val connected = engine.connect(printerId, timeout, force)
+        val setAsDefault = call.getBoolean("setAsDefault", false) ?: false
+        val connected = engine.connect(printerId, timeout, force, setAsDefault)
         JSObject().put("connected", connected)
     }
 
@@ -181,6 +195,8 @@ class ThermalPrinterPlugin : Plugin() {
         val render = call.getObject("render")?.let { r ->
             RenderOptions(
                 widthDots = r.optInt("widthDots", 0),
+                resize = r.optBoolean("resize", true),
+                grayscale = r.optBoolean("grayscale", true),
                 threshold = r.optInt("threshold", 128),
                 dithering = r.optString("dithering", "floyd_steinberg"),
                 align = r.optString("align", "center"),
@@ -201,14 +217,36 @@ class ThermalPrinterPlugin : Plugin() {
             autoReconnect = call.getBoolean("autoReconnect", true) ?: true,
         )
         val out = engine.printImage(req)
-        JSObject().apply {
-            put("success", true)
-            put("printerId", out.printerId)
-            put("adapter", out.adapter.value)
-            put("bytesSent", out.bytesSent)
-            put("durationMs", out.durationMs)
-            out.status?.let { put("status", it.toJson()) }
-        }
+        printResultJson(out)
+    }
+
+    @PluginMethod
+    fun printText(call: PluginCall) = exec(call) {
+        val itemsArr = call.getArray("items")
+            ?: throw PrinterException(com.resto.thermalprinter.model.ErrorCode.IMAGE_INVALID, "items requis")
+        val items = com.resto.thermalprinter.model.PrintItem.parseList(itemsArr)
+        val req = ThermalPrinterEngine.PrintTextRequest(
+            printerId = call.getString("printerId"),
+            items = items,
+            defaultCodePage = call.getString("defaultCodePage") ?: "WPC1252",
+            cut = call.getBoolean("cut", false) ?: false,
+            feedLines = call.getInt("feedLines") ?: 3,
+            timeoutMs = (call.getInt("timeoutMs")?.toLong()) ?: 15000L,
+            autoReconnect = call.getBoolean("autoReconnect", true) ?: true,
+        )
+        val out = engine.printText(req)
+        printResultJson(out)
+    }
+
+    private fun printResultJson(out: ThermalPrinterEngine.PrintOutcome): JSObject = JSObject().apply {
+        put("success", out.state == "completed")
+        put("printerId", out.printerId)
+        put("adapter", out.adapter.value)
+        put("jobId", out.jobId)
+        put("state", out.state)
+        put("bytesSent", out.bytesSent)
+        put("durationMs", out.durationMs)
+        out.status?.let { put("status", it.toJson()) }
     }
 
     @PluginMethod

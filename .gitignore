@@ -20,3 +20,6 @@ ios/build/
 
 # Vendor SDK (ne jamais committer les SDK propriétaires)
 **/vendor-sdk/
+
+# Tests / coverage
+coverage/

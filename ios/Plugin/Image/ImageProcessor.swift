@@ -71,15 +71,17 @@ enum ImageProcessor {
     // MARK: - Binarisation
 
     /// Produit un MonoBitmap (1 = encre/noir).
+    /// Si `options.grayscale == false`, l'image est considérée déjà préparée : seuil simple.
     static func toMono(_ image: UIImage, options: RenderOptions) throws -> MonoBitmap {
         var (gray, w, h) = try grayscaleBuffer(image)
         if options.invert {
             for i in 0..<gray.count { gray[i] = 255 - gray[i] }
         }
         let data: [UInt8]
-        switch options.dithering {
-        case "none": data = threshold(gray, options.threshold)
-        case "atkinson": data = atkinson(gray, w, h)
+        switch (options.grayscale, options.dithering) {
+        case (false, _): data = threshold(gray, options.threshold)
+        case (_, "none"): data = threshold(gray, options.threshold)
+        case (_, "atkinson"): data = atkinson(gray, w, h)
         default: data = floydSteinberg(gray, w, h)
         }
         return MonoBitmap(width: w, height: h, data: data)

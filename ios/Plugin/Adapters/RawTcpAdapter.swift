@@ -49,6 +49,18 @@ final class RawTcpAdapter: PrinterAdapter {
         return job.count
     }
 
+    func printItems(_ profile: PrinterProfile, items: [PrintItem], defaultCodePage: String, cut: Bool, feedLines: Int) async throws -> Int {
+        lock.lock(); let t = connections[profile.id]; lock.unlock()
+        guard let transport = t else { throw PrinterError(.CONNECTION_FAILED, "rawTcp non connecté") }
+        let columns = profile.capabilities.printableDots <= 420 ? 32 : 48
+        let encoded = EscPosTextEncoder.encode(items, defaultCodePage: defaultCodePage, columns: columns)
+        var job = encoded.bytes
+        if feedLines > 0 { job += EscPosCommands.feed(feedLines) }
+        if cut { job += EscPosCommands.CUT_PARTIAL }
+        try await transport.write(job)
+        return job.count
+    }
+
     func getStatus(_ profile: PrinterProfile) async throws -> PrinterStatus {
         let c = isConnected(profile.id)
         return PrinterStatus(id: profile.id, connection: c ? "connected" : "disconnected", online: c, paper: "unknown", rawStatus: "rawTcp: statut non supporté")

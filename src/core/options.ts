@@ -20,6 +20,18 @@ export interface PrintRenderOptions {
    * (ex: 384 pour 58mm, 576 pour 80mm).
    */
   widthDots?: number;
+  /**
+   * Redimensionner l'image à la largeur cible. Défaut `true`.
+   * Mettre `false` si l'image est DÉJÀ à la bonne largeur (rendu serveur) :
+   * envoi tel quel, pixel-perfect, plus rapide.
+   */
+  resize?: boolean;
+  /**
+   * Conversion niveaux de gris + dithering. Défaut `true`.
+   * Mettre `false` si l'image est DÉJÀ en 1-bit noir/blanc (pré-traitée serveur) :
+   * un simple seuil est appliqué, sans dithering.
+   */
+  grayscale?: boolean;
   /** Seuil de binarisation 0-255 (défaut 128) quand dithering = 'none'. */
   threshold?: number;
   /** Algorithme de tramage. Défaut: 'floyd_steinberg'. */
@@ -105,13 +117,41 @@ export type DiscoverySource =
   | 'ble'
   | 'usb';
 
-/** Options de connexion explicite. */
+/**
+ * Options de l'appel printText.
+ */
+export interface PrintTextOptions {
+  /** Imprimante cible. Si omis, utilise l'imprimante par défaut. */
+  printerId?: string;
+  /** Liste ordonnée d'items à imprimer (texte stylé, QR, code-barres, feed, cut...). */
+  items: import('./text').PrintItem[];
+  /** Page de code par défaut pour les accents (français : 'WPC1252'). */
+  defaultCodePage?: import('./text').CodePage;
+  /** Couper le papier en fin de job (si non géré par un item `cut`). Défaut false. */
+  cut?: boolean;
+  /** Lignes d'avance en fin de job avant la coupe. Défaut 3. */
+  feedLines?: number;
+  /** Timeout global de l'opération en ms. Défaut 15000. */
+  timeoutMs?: number;
+  /** Reconnexion automatique si non connecté. Défaut true. */
+  autoReconnect?: boolean;
+}
+
+/**
+ * Options de connexion explicite.
+ */
 export interface ConnectOptions {
   printerId: string;
   /** Timeout de connexion ms. Défaut 10000. */
   timeoutMs?: number;
   /** Forcer un adapter (sinon: celui résolu à la découverte / dans le profil). */
   forceAdapter?: PrinterAdapterId;
+  /**
+   * Si `true`, enregistre cette imprimante comme imprimante par défaut
+   * UNIQUEMENT si la connexion réussit (persistance du profil incluse).
+   * Défaut `false`.
+   */
+  setAsDefault?: boolean;
 }
 
 /**

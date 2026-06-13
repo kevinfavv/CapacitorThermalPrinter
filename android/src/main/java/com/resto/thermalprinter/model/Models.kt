@@ -193,6 +193,8 @@ data class PrinterStatus(
 /** Options de rendu résolues passées à l'adapter. */
 data class RenderOptions(
     val widthDots: Int,
+    val resize: Boolean = true,
+    val grayscale: Boolean = true,
     val threshold: Int = 128,
     val dithering: String = "floyd_steinberg", // none|floyd_steinberg|atkinson
     val align: String = "center", // left|center|right

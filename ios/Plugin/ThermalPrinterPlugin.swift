@@ -20,6 +20,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getSavedPrinters", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "removePrinter", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "printImage", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "printText", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getPrinterStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
@@ -29,6 +30,13 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private let engine = ThermalPrinterEngine()
+
+    override public func load() {
+        // Relaye les états de job vers le JS (event printJobStatus).
+        engine.onJobUpdate = { [weak self] update in
+            self?.notifyListeners("printJobStatus", data: ["job": update.toDict()])
+        }
+    }
 
     // MARK: Permissions
     //
@@ -86,8 +94,9 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let timeout = call.getInt("timeoutMs") ?? 10000
         let force = call.getString("forceAdapter").map { AdapterId.from($0) }
+        let setAsDefault = call.getBool("setAsDefault") ?? false
         Task { await self.guarded(call) {
-            let connected = try await self.engine.connect(printerId, timeoutMs: timeout, forceAdapter: force)
+            let connected = try await self.engine.connect(printerId, timeoutMs: timeout, forceAdapter: force, setAsDefault: setAsDefault)
             call.resolve(["connected": connected])
         } }
     }
@@ -129,6 +138,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         if let r = call.getObject("render") {
             render = RenderOptions(
                 widthDots: r["widthDots"] as? Int ?? 0,
+                resize: r["resize"] as? Bool ?? true,
+                grayscale: r["grayscale"] as? Bool ?? true,
                 threshold: r["threshold"] as? Int ?? 128,
                 dithering: r["dithering"] as? String ?? "floyd_steinberg",
                 align: r["align"] as? String ?? "center",
@@ -150,13 +161,41 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         )
         Task { await self.guarded(call) {
             let out = try await self.engine.printImage(req)
-            var result: [String: Any] = [
-                "success": true, "printerId": out.printerId, "adapter": out.adapter.rawValue,
-                "bytesSent": out.bytesSent, "durationMs": out.durationMs,
-            ]
-            if let status = out.status { result["status"] = status.toDict() }
-            call.resolve(result)
+            call.resolve(self.printResultDict(out))
         } }
+    }
+
+    @objc func printText(_ call: CAPPluginCall) {
+        guard let rawItems = call.getArray("items") as? [[String: Any]] else {
+            return reject(call, .IMAGE_INVALID, "items requis")
+        }
+        let req = ThermalPrinterEngine.PrintTextRequest(
+            printerId: call.getString("printerId"),
+            items: PrintItem.parseList(rawItems),
+            defaultCodePage: call.getString("defaultCodePage") ?? "WPC1252",
+            cut: call.getBool("cut") ?? false,
+            feedLines: call.getInt("feedLines") ?? 3,
+            timeoutMs: call.getInt("timeoutMs") ?? 15000,
+            autoReconnect: call.getBool("autoReconnect") ?? true
+        )
+        Task { await self.guarded(call) {
+            let out = try await self.engine.printText(req)
+            call.resolve(self.printResultDict(out))
+        } }
+    }
+
+    private func printResultDict(_ out: ThermalPrinterEngine.PrintOutcome) -> [String: Any] {
+        var result: [String: Any] = [
+            "success": out.state == "completed",
+            "printerId": out.printerId,
+            "adapter": out.adapter.rawValue,
+            "jobId": out.jobId,
+            "state": out.state,
+            "bytesSent": out.bytesSent,
+            "durationMs": out.durationMs,
+        ]
+        if let status = out.status { result["status"] = status.toDict() }
+        return result
     }
 
     @objc func getPrinterStatus(_ call: CAPPluginCall) {

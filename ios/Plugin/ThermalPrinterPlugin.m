@@ -12,6 +12,7 @@ CAP_PLUGIN(ThermalPrinterPlugin, "ThermalPrinter",
     CAP_PLUGIN_METHOD(getSavedPrinters, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(removePrinter, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(printImage, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(printText, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(getPrinterStatus, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(requestPermissions, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(checkPermissions, CAPPluginReturnPromise);

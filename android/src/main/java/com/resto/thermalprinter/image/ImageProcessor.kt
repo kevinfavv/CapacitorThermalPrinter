@@ -113,6 +113,8 @@ object ImageProcessor {
 
     /**
      * Produit un MonoBitmap (1 = encre/noir) selon l'option de dithering.
+     * Si `options.grayscale == false`, on considère l'image déjà préparée
+     * (noir/blanc) : seuil simple, jamais de dithering.
      */
     fun toMono(bmp: Bitmap, options: RenderOptions): MonoBitmap {
         val w = bmp.width
@@ -121,9 +123,10 @@ object ImageProcessor {
         if (options.invert) {
             for (i in gray.indices) gray[i] = 255 - gray[i]
         }
-        val data = when (options.dithering) {
-            "none" -> threshold(gray, options.threshold)
-            "atkinson" -> atkinson(gray, w, h)
+        val data = when {
+            !options.grayscale -> threshold(gray, options.threshold)
+            options.dithering == "none" -> threshold(gray, options.threshold)
+            options.dithering == "atkinson" -> atkinson(gray, w, h)
             else -> floydSteinberg(gray, w, h)
         }
         return MonoBitmap(w, h, data)
