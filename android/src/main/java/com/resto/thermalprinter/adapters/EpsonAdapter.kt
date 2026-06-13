@@ -32,6 +32,8 @@ class EpsonAdapter(private val context: Context) : PrinterAdapter {
 
     override fun isAvailable(): Boolean = classExists(PRINTER)
 
+    override fun supportsTextItems(): Boolean = isAvailable()
+
     // -------------------------------------------------------------------------
     // Découverte (Discovery.start + DiscoveryListener via proxy)
     // -------------------------------------------------------------------------
@@ -164,6 +166,127 @@ class EpsonAdapter(private val context: Context) : PrinterAdapter {
             throw PrinterException(ErrorCode.PRINT_FAILED, "Impression Epson échouée", e.message, retryable = true)
         }
         return bitmap.width * bitmap.height / 8
+    }
+
+    // -------------------------------------------------------------------------
+    // Impression texte stylé (builder ePOS2 natif)
+    // -------------------------------------------------------------------------
+
+    override suspend fun printItems(
+        profile: PrinterProfile,
+        items: List<com.resto.thermalprinter.model.PrintItem>,
+        defaultCodePage: String,
+        cut: Boolean,
+        feedLines: Int,
+    ): Int {
+        val printer = cache[profile.id]
+            ?: throw PrinterException(ErrorCode.CONNECTION_FAILED, "Epson non connecté: ${profile.id}")
+        try {
+            SdkReflect.call(printer, "beginTransaction")
+            for (item in items) mapTextItem(printer, item, profile)
+            if (feedLines > 0) callInt(printer, "addFeedLine", feedLines)
+            if (cut && profile.capabilities.supportsCut) callInt(printer, "addCut", SdkReflect.staticInt(PRINTER, "CUT_FEED", 1))
+            callInt(printer, "sendData", SdkReflect.staticInt(PRINTER, "PARAM_DEFAULT", -2))
+            SdkReflect.call(printer, "endTransaction")
+            runCatching { SdkReflect.call(printer, "clearCommandBuffer") }
+        } catch (e: Throwable) {
+            runCatching { SdkReflect.call(printer, "clearCommandBuffer") }
+            throw PrinterException(ErrorCode.PRINT_FAILED, "Impression texte Epson échouée", e.message, retryable = true)
+        }
+        return items.size
+    }
+
+    private fun mapTextItem(printer: Any, item: com.resto.thermalprinter.model.PrintItem, profile: PrinterProfile) {
+        val P = com.resto.thermalprinter.model.PrintItem
+        val tru = SdkReflect.staticInt(PRINTER, "TRUE", 1)
+        val fls = SdkReflect.staticInt(PRINTER, "FALSE", 0)
+        when (item) {
+            is com.resto.thermalprinter.model.PrintItem.Text -> {
+                val s = item.style
+                callInt(printer, "addTextAlign", alignConst(s.align))
+                SdkReflect.call(
+                    printer, "addTextStyle",
+                    arrayOf(Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!),
+                    arrayOf(if (s.invert) tru else fls, if (s.underline != "none") tru else fls, if (s.bold) tru else fls, SdkReflect.staticInt(PRINTER, "COLOR_1", 1)),
+                )
+                SdkReflect.call(
+                    printer, "addTextSize",
+                    arrayOf(Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!),
+                    arrayOf(s.widthMultiplier.coerceIn(1, 8), s.heightMultiplier.coerceIn(1, 8)),
+                )
+                callStr(printer, "addText", if (s.newline) item.value + "\n" else item.value)
+            }
+            is com.resto.thermalprinter.model.PrintItem.Feed -> callInt(printer, "addFeedLine", item.lines.coerceIn(1, 255))
+            is com.resto.thermalprinter.model.PrintItem.Cut ->
+                callInt(printer, "addCut", SdkReflect.staticInt(PRINTER, if (item.mode == "full") "CUT_NO_FEED" else "CUT_FEED", 1))
+            is com.resto.thermalprinter.model.PrintItem.Divider -> {
+                val cols = item.columns ?: if (profile.capabilities.printableDots <= 420) 32 else 48
+                callInt(printer, "addTextAlign", alignConst(item.align))
+                callStr(printer, "addText", item.char.take(1).ifEmpty { "-" }.repeat(cols.coerceIn(1, 96)) + "\n")
+            }
+            is com.resto.thermalprinter.model.PrintItem.QrCode -> {
+                callInt(printer, "addTextAlign", alignConst(item.align))
+                val i = Int::class.javaPrimitiveType!!
+                SdkReflect.call(
+                    printer, "addSymbol",
+                    arrayOf(String::class.java, i, i, i, i, i),
+                    arrayOf(item.value, SdkReflect.staticInt(PRINTER, "SYMBOL_QRCODE_MODEL_2", 0), qrLevelConst(item.ec), item.size.coerceIn(1, 16), item.size.coerceIn(1, 16), 0),
+                )
+            }
+            is com.resto.thermalprinter.model.PrintItem.Barcode -> {
+                callInt(printer, "addTextAlign", alignConst(item.align))
+                val i = Int::class.javaPrimitiveType!!
+                SdkReflect.call(
+                    printer, "addBarcode",
+                    arrayOf(String::class.java, i, i, i, i, i),
+                    arrayOf(
+                        item.value, barcodeConst(item.symbology),
+                        SdkReflect.staticInt(PRINTER, if (item.hri == "none") "HRI_NONE" else "HRI_BELOW", 0),
+                        SdkReflect.staticInt(PRINTER, "FONT_A", 0),
+                        item.width.coerceIn(2, 6), item.height.coerceIn(1, 255),
+                    ),
+                )
+            }
+            is com.resto.thermalprinter.model.PrintItem.CashDrawer ->
+                SdkReflect.call(
+                    printer, "addPulse",
+                    arrayOf(Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!),
+                    arrayOf(SdkReflect.staticInt(PRINTER, "DRAWER_2PIN", 0), SdkReflect.staticInt(PRINTER, "PULSE_100", 0)),
+                )
+            is com.resto.thermalprinter.model.PrintItem.Image, is com.resto.thermalprinter.model.PrintItem.Raw -> Unit
+        }
+        @Suppress("UNUSED_EXPRESSION") P
+    }
+
+    private fun callInt(target: Any, method: String, value: Int) =
+        SdkReflect.call(target, method, arrayOf(Int::class.javaPrimitiveType!!), arrayOf(value))
+
+    private fun callStr(target: Any, method: String, value: String) =
+        SdkReflect.call(target, method, arrayOf(String::class.java), arrayOf(value))
+
+    private fun alignConst(align: String?): Int = when (align) {
+        "center" -> SdkReflect.staticInt(PRINTER, "ALIGN_CENTER", 1)
+        "right" -> SdkReflect.staticInt(PRINTER, "ALIGN_RIGHT", 2)
+        else -> SdkReflect.staticInt(PRINTER, "ALIGN_LEFT", 0)
+    }
+
+    private fun qrLevelConst(ec: String): Int = when (ec.uppercase()) {
+        "L" -> SdkReflect.staticInt(PRINTER, "LEVEL_L", 0)
+        "Q" -> SdkReflect.staticInt(PRINTER, "LEVEL_Q", 2)
+        "H" -> SdkReflect.staticInt(PRINTER, "LEVEL_H", 3)
+        else -> SdkReflect.staticInt(PRINTER, "LEVEL_M", 1)
+    }
+
+    private fun barcodeConst(symbology: String): Int = when (symbology.uppercase()) {
+        "CODE39" -> SdkReflect.staticInt(PRINTER, "BARCODE_CODE39", 0)
+        "CODE93" -> SdkReflect.staticInt(PRINTER, "BARCODE_CODE93", 0)
+        "EAN13" -> SdkReflect.staticInt(PRINTER, "BARCODE_EAN13", 0)
+        "EAN8" -> SdkReflect.staticInt(PRINTER, "BARCODE_EAN8", 0)
+        "ITF" -> SdkReflect.staticInt(PRINTER, "BARCODE_ITF", 0)
+        "UPCA" -> SdkReflect.staticInt(PRINTER, "BARCODE_UPC_A", 0)
+        "UPCE" -> SdkReflect.staticInt(PRINTER, "BARCODE_UPC_E", 0)
+        "CODABAR" -> SdkReflect.staticInt(PRINTER, "BARCODE_CODABAR", 0)
+        else -> SdkReflect.staticInt(PRINTER, "BARCODE_CODE128", 0)
     }
 
     // -------------------------------------------------------------------------

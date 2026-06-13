@@ -57,6 +57,8 @@ class StarAdapter(private val context: Context) : PrinterAdapter {
     override fun isAvailable(): Boolean =
         EpsonAdapter.classExists("com.starmicronics.stario10.StarPrinter")
 
+    override fun supportsTextItems(): Boolean = true
+
     // -------------------------------------------------------------------------
     // Découverte
     // -------------------------------------------------------------------------

@@ -10,6 +10,8 @@ final class RawTcpAdapter: PrinterAdapter {
 
     func isAvailable() -> Bool { true }
 
+    func supportsTextItems() -> Bool { true }
+
     func discover(timeoutMs: Int, onFound: @escaping (DiscoveredPrinter) -> Void) async {}
 
     func canHandle(_ profile: PrinterProfile) -> Bool {

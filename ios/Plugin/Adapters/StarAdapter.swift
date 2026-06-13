@@ -38,6 +38,8 @@ final class StarAdapter: PrinterAdapter {
 
     func canHandle(_ profile: PrinterProfile) -> Bool { isAvailable() && profile.adapter == .star }
 
+    func supportsTextItems() -> Bool { isAvailable() }
+
     // MARK: Découverte
 
     func discover(timeoutMs: Int, onFound: @escaping (DiscoveredPrinter) -> Void) async {

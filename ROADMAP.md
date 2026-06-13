@@ -35,19 +35,23 @@
 - [x] **Epson ePOS2** (Android réflexion + iOS canImport) : discovery, connect, `addImage`, cut, drawer, statut.
 - [x] **Brother** (Android réflexion + iOS pod) : recherche réseau, `printImage`, settings par modèle.
 - [x] **Zebra Link-OS** (Android réflexion + iOS canImport) : discovery, image → ZPL, statut. (Jamais ESC/POS.)
-- [ ] Mapping `printText` → builder Epson/Brother/Zebra (Star fait ; sinon utiliser `printImage`).
+- [x] Mapping `printText` → builder : **Star** (natif, 2 plateformes) et **Epson Android**
+      (builder ePOS2 natif). **Epson iOS / Brother / Zebra** : repli automatique en image
+      (`TextRasterizer` → `printImage`) via le flag `supportsTextItems()`.
 
 ## Transports — finalisés ✅
 
 - [x] **BLE GATT** (Android) : connexion GATT, négociation MTU, écriture par paquets, **allowlist d'UUID** (`BleGattClient`), scan BLE filtré.
 - [x] **USB host Android** : permission runtime + claimInterface + transfert bulk sur l'endpoint OUT.
-- [ ] **BLE iOS** : via SDK MFi (Star/Epson/Brother) ; pas de GATT générique exposé par le plugin.
+- [x] **BLE iOS** : décision actée — via SDK MFi (Star/Epson/Brother) ; **pas de GATT
+      générique** exposé par le plugin (garde `UNSUPPORTED_TRANSPORT` explicite + doc).
 
 ## Monitoring — fait ✅
 
 - [x] **Phase 6** : `startStatusMonitor`/`stopStatusMonitor` (Android + iOS), polling
       périodique + émission `statusChange` sur diff d'état.
-- [ ] Reconnexion intelligente avec backoff, détection de reprise après `hold`.
+- [x] Reconnexion intelligente avec **backoff exponentiel** (`ensureConnected`, 3 tentatives)
+      + **détection de reprise après `hold`** dans le monitor (transition bloqué → ok).
 
 ## À faire ⛔
 

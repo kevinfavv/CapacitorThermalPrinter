@@ -76,13 +76,40 @@ final class ThermalPrinterEngine {
         await adapter.disconnect(printerId)
     }
 
+    private static let reconnectAttempts = 3
+
+    /// Reconnexion auto avec **backoff exponentiel** (300ms, 600ms, 1200ms…, plafonné).
+    /// Les erreurs non-retryables court-circuitent.
     private func ensureConnected(_ profile: PrinterProfile, timeoutMs: Int) async throws {
         guard let adapter = adapterFor(profile.adapter) else {
             throw PrinterError(.UNSUPPORTED_PRINTER, "Adapter introuvable")
         }
         if adapter.isConnected(profile.id) { return }
-        Logger.shared.log("connect", "auto-reconnect", ["id": profile.id])
-        try await adapter.connect(profile, timeoutMs: timeoutMs)
+
+        var backoff: UInt64 = 300
+        var lastError: Error?
+        for attempt in 1...Self.reconnectAttempts {
+            do {
+                Logger.shared.log("connect", "auto-reconnect", ["id": profile.id, "attempt": attempt])
+                try await adapter.connect(profile, timeoutMs: timeoutMs)
+                if adapter.isConnected(profile.id) {
+                    if attempt > 1 { Logger.shared.log("connect", "reconnect-recovered", ["id": profile.id, "attempt": attempt]) }
+                    return
+                }
+                lastError = PrinterError(.CONNECTION_FAILED, "Connexion non établie", retryable: true)
+            } catch let e as PrinterError {
+                lastError = e
+                if !e.retryable { throw e }
+            } catch {
+                lastError = error
+            }
+            if attempt < Self.reconnectAttempts {
+                Logger.shared.log("connect", "backoff", ["id": profile.id, "delayMs": backoff])
+                try? await Task.sleep(nanoseconds: backoff * 1_000_000)
+                backoff = min(backoff * 2, 3000)
+            }
+        }
+        throw lastError ?? PrinterError(.CONNECTION_FAILED, "Reconnexion échouée (\(Self.reconnectAttempts) tentatives)", retryable: true)
     }
 
     // MARK: Impression
@@ -165,7 +192,19 @@ final class ThermalPrinterEngine {
             try await preflightHold(adapter, profile, jobId)
 
             emitJob(jobId, profile.id, "printing", progress: 0.1)
-            let bytes = try await adapter.printItems(profile, items: req.items, defaultCodePage: req.defaultCodePage, cut: req.cut, feedLines: req.feedLines)
+            let bytes: Int
+            if adapter.supportsTextItems() {
+                bytes = try await adapter.printItems(profile, items: req.items, defaultCodePage: req.defaultCodePage, cut: req.cut, feedLines: req.feedLines)
+            } else {
+                // Repli : rendre les items en image puis imprimer via le SDK image (Brother/Zebra).
+                let width = profile.capabilities.printableDots > 0 ? profile.capabilities.printableDots : 576
+                let image = TextRasterizer.render(req.items, widthDots: width)
+                var render = RenderOptions(widthDots: width)
+                render.resize = false
+                render.cut = req.cut
+                render.feedLines = req.feedLines
+                bytes = try await adapter.printImage(profile, image: image, options: render)
+            }
             let status = try? await adapter.getStatus(profile)
             let duration = Int(Date().timeIntervalSince(started) * 1000)
             emitJob(jobId, profile.id, "completed", progress: 1.0)
@@ -228,6 +267,7 @@ final class ThermalPrinterEngine {
         let interval = min(max(intervalMs, 1000), 300_000)
         let task = Task { [weak self] in
             var lastKey: String?
+            var lastBlocked = false
             while !Task.isCancelled {
                 guard let self = self else { return }
                 let status: PrinterStatus
@@ -238,12 +278,19 @@ final class ThermalPrinterEngine {
                 } catch {
                     status = PrinterStatus(id: printerId, connection: "error", online: false, paper: "unknown", rawStatus: "\(error)")
                 }
+                // "Bloqué" = condition qui mettrait un job en hold (papier/capot/offline).
+                let blocked = status.paper == "empty" || status.coverOpen == true || !status.online
                 let key = "\(status.connection)|\(status.online)|\(status.paper)|\(String(describing: status.coverOpen))|\(String(describing: status.errorCode))"
                 if key != lastKey {
                     lastKey = key
                     self.onStatusChange?(status)
+                    if lastBlocked && !blocked {
+                        // Reprise après hold (papier rechargé / capot fermé / retour online).
+                        Logger.shared.log("status", "recovered", ["id": printerId])
+                    }
                     Logger.shared.log("status", "change", ["id": printerId, "paper": status.paper])
                 }
+                lastBlocked = blocked
                 try? await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000)
             }
         }

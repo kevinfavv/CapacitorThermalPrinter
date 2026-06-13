@@ -133,7 +133,15 @@ présent.
 | **Epson** | ⛔ `.jar`+`.so` manuel | ⛔ xcframework manuel | Déposer `ePOS2.jar` (Android) / `libepos2.xcframework` (iOS). |
 | **Zebra** | ⚠️ Maven privé (token) ou `.jar` | ⛔ xcframework manuel | Token Zebra ou `ZSDK_ANDROID_API.jar` ; `ZSDK_API.xcframework` (iOS). |
 
-Détails complets (où déposer chaque binaire, dépôt Maven privé Zebra, noms de
+**Liens de téléchargement officiels :**
+- **Star** : [StarXpand-SDK-Android](https://github.com/star-micronics/StarXpand-SDK-Android) · [StarXpand-SDK-iOS](https://github.com/star-micronics/StarXpand-SDK-iOS) (rien à télécharger : Maven Central / SPM)
+- **Epson** : [Epson Developers](https://epson.com/developers-products) · [MFi / ePOS SDK](https://global.epson.com/products_and_drivers/tm/en/mfi.html)
+- **Brother** : [Mobile SDK (download)](https://support.brother.com/g/s/es/dev/en/mobilesdk/download/index.html) · US : [Brother Developer Program](https://developerprogram.brother-usa.com/sdk-download) · iOS pod : [BRLMPrinterKit](https://cocoapods.org/pods/BRLMPrinterKit)
+- **Zebra** : [Link-OS Multiplatform SDK](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk) · [Téléchargements & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)
+
+> Epson / Brother / Zebra : compte développeur gratuit + acceptation de licence requis.
+
+Procédure détaillée (où déposer chaque binaire, dépôt Maven privé Zebra, noms de
 modules iOS, dossier de test ignoré par git) : **[`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md)**.
 
 ### Savoir quels SDK sont actifs (runtime)
@@ -613,7 +621,9 @@ catch (e) {
 - ❌ **Pas de Bluetooth Classic / SPP générique.** Une imprimante BT « chinoise » générique **n'est pas adressable** sauf si elle expose un service BLE exploitable.
 - ✅ **SDK fabricants MFi** (Epson/Star/Brother/Zebra) : c'est **la** voie pour le Bluetooth sur iOS.
 - ✅ **Wi-Fi TCP** (port 9100) via `Network.framework` → déclencher la pop-up **Réseau local**.
-- ⚠️ **BLE** uniquement si l'imprimante expose un service GATT série utilisable.
+- ❌ **Pas de GATT BLE générique exposé par le plugin sur iOS.** Le BLE passe par les
+  SDK MFi (Star/Epson/Brother). Tenter un transport `ble`/`bluetooth`/`usb` sur
+  l'adapter ESC/POS générique renvoie une erreur `UNSUPPORTED_TRANSPORT` explicite.
 - ❌ Pas d'USB host pour ce cas.
 
 > **Ne promettez jamais** une compatibilité Bluetooth universelle sur iOS. En pratique : **Wi-Fi pour tout le monde, Bluetooth via SDK fabricant**.
@@ -636,10 +646,12 @@ catch (e) {
 
 - **Android (JUnit)** : `android/src/test/...` valide les encodeurs ESC/POS texte et raster
   (mêmes assertions octet-à-octet que les tests TS) → `./gradlew test`.
+- **Coverage connexion SDK** : les adapters réflexifs (Epson/Zebra/Brother) sont couverts
+  via un **faux SDK sur le classpath de test** (Robolectric, sans binaire ni imprimante) +
+  JaCoCo. Exemple fourni pour Epson (`EpsonAdapterTest`, `SdkReflectTest`).
+  → `./gradlew testDebugUnitTest jacocoTestReport`. Voir **[`docs/TESTING_SDK.md`](docs/TESTING_SDK.md)**.
 - **iOS (XCTest)** : `ios/Tests/...` valide l'encodeur (mêmes vecteurs) → `xcodebuild test`.
-- **Tests d'intégration SDK** : à exécuter sur matériel réel quand les SDK sont liés
-  (voir ROADMAP). Les trois implémentations d'encodeur (TS/Kotlin/Swift) partagent les
-  **mêmes vecteurs de test**, garantissant un flux d'octets identique multiplateforme.
+- **Tests d'intégration SDK** (couche 3) : sur matériel réel quand les SDK sont liés (voir ROADMAP).
 
 ## Plan d'implémentation par phases
 

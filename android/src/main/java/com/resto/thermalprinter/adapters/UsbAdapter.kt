@@ -53,6 +53,8 @@ class UsbAdapter(private val context: Context) : PrinterAdapter {
     override fun isAvailable(): Boolean =
         context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST)
 
+    override fun supportsTextItems(): Boolean = true
+
     override suspend fun discover(timeoutMs: Long, onFound: (DiscoveredPrinter) -> Unit) {
         if (!isAvailable()) return
         usbManager.deviceList.values.forEach { device ->

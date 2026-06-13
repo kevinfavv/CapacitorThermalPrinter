@@ -27,6 +27,8 @@ class RawTcpAdapter : PrinterAdapter {
 
     override fun isAvailable(): Boolean = true
 
+    override fun supportsTextItems(): Boolean = true
+
     override suspend fun discover(timeoutMs: Long, onFound: (DiscoveredPrinter) -> Unit) {
         // Délégué au TcpScanner.
     }

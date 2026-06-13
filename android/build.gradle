@@ -19,6 +19,7 @@ buildscript {
 
 apply plugin: 'com.android.library'
 apply plugin: 'kotlin-android'
+apply plugin: 'jacoco'
 
 android {
     namespace "com.resto.thermalprinter"
@@ -43,6 +44,12 @@ android {
     buildTypes {
         release {
             minifyEnabled false
+        }
+    }
+    testOptions {
+        unitTests {
+            includeAndroidResources = true
+            returnDefaultValues = true
         }
     }
 }
@@ -90,6 +97,26 @@ dependencies {
     // à les embarquer dans l'app consommatrice quand ils sont présents.
 
     testImplementation "junit:junit:$junitVersion"
+    // Tests JVM des adapters SDK (faux SDK sur le classpath de test) + Robolectric
+    // pour Context/Bitmap, sans émulateur. Voir docs/TESTING_SDK.md.
+    testImplementation "org.robolectric:robolectric:4.13"
+    testImplementation "androidx.test:core:1.6.1"
+    testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+}
+
+// Rapport de couverture des tests unitaires JVM (./gradlew testDebugUnitTest jacocoTestReport)
+tasks.register('jacocoTestReport', JacocoReport) {
+    dependsOn 'testDebugUnitTest'
+    reports {
+        html.required = true
+        xml.required = true
+    }
+    def kotlinClasses = fileTree(dir: "${buildDir}/tmp/kotlin-classes/debug", excludes: [
+        '**/model/**', // data classes / JSON mapping
+    ])
+    classDirectories.setFrom(kotlinClasses)
+    sourceDirectories.setFrom(files('src/main/java'))
+    executionData.setFrom(fileTree(dir: buildDir, includes: ['**/testDebugUnitTest.exec', '**/jacoco/*.exec']))
 }

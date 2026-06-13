@@ -39,6 +39,8 @@ class BleAdapter(private val context: Context) : PrinterAdapter {
     override fun isAvailable(): Boolean =
         context.packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_BLUETOOTH_LE)
 
+    override fun supportsTextItems(): Boolean = true
+
     override suspend fun discover(timeoutMs: Long, onFound: (DiscoveredPrinter) -> Unit) {
         // Délégué à BleScanner (DiscoveryManager).
     }

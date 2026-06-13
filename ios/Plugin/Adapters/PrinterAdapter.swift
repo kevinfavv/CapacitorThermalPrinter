@@ -15,6 +15,10 @@ protocol PrinterAdapter {
 
     func canHandle(_ profile: PrinterProfile) -> Bool
 
+    /// True si l'adapter imprime des items texte NATIVEMENT. Sinon le moteur rend
+    /// les items en image (TextRasterizer) puis appelle `printImage`.
+    func supportsTextItems() -> Bool
+
     func connect(_ profile: PrinterProfile, timeoutMs: Int) async throws
     func isConnected(_ printerId: String) -> Bool
     func disconnect(_ printerId: String) async
@@ -32,6 +36,8 @@ protocol PrinterAdapter {
 
 /// Implémentation par défaut : printText non supporté (les SDK la surchargent).
 extension PrinterAdapter {
+    func supportsTextItems() -> Bool { false }
+
     func printItems(_ profile: PrinterProfile, items: [PrintItem], defaultCodePage: String, cut: Bool, feedLines: Int) async throws -> Int {
         throw PrinterError(.SDK_NOT_AVAILABLE, "printText non implémenté pour cet adapter (\(id.rawValue)) — voir docs/SDK_INTEGRATION.md")
     }

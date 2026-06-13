@@ -16,6 +16,8 @@ final class EscPosAdapter: PrinterAdapter {
 
     func isAvailable() -> Bool { true }
 
+    func supportsTextItems() -> Bool { true }
+
     func discover(timeoutMs: Int, onFound: @escaping (DiscoveredPrinter) -> Void) async {
         // Délégué au TcpScanner / Bonjour (DiscoveryManager).
     }
@@ -26,6 +28,15 @@ final class EscPosAdapter: PrinterAdapter {
 
     func connect(_ profile: PrinterProfile, timeoutMs: Int) async throws {
         if isConnected(profile.id) { return }
+        // iOS : pas de Bluetooth Classic/SPP ni de GATT BLE générique exposé par le
+        // plugin. Le BLE/Bluetooth passe par les SDK MFi (Star/Epson/Brother).
+        guard profile.transport == .wifi || profile.transport == .ethernet else {
+            throw PrinterError(
+                .UNSUPPORTED_TRANSPORT,
+                "iOS : le transport \(profile.transport.rawValue) générique n'est pas exposé. " +
+                "Utilisez une imprimante via son SDK MFi (Star/Epson/Brother). Voir docs/SDK_INTEGRATION.md."
+            )
+        }
         let (host, port) = splitHostPort(profile.address, defaultPort: 9100)
         let t = TcpTransport(host: host, port: port)
         try await t.open(timeoutMs: timeoutMs)

@@ -16,6 +16,7 @@ import com.resto.thermalprinter.adapters.ZebraAdapter
 import com.resto.thermalprinter.discovery.DiscoveryManager
 import com.resto.thermalprinter.image.ImageCache
 import com.resto.thermalprinter.image.ImageProcessor
+import com.resto.thermalprinter.image.TextRasterizer
 import com.resto.thermalprinter.model.AdapterId
 import com.resto.thermalprinter.model.Capabilities
 import com.resto.thermalprinter.model.DiscoveredPrinter
@@ -81,6 +82,10 @@ class ThermalPrinterEngine(private val context: Context) {
     /** Scope + registre des moniteurs de statut actifs (Phase 6). */
     private val monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val monitors = ConcurrentHashMap<String, Job>()
+
+    private companion object {
+        const val RECONNECT_ATTEMPTS = 3
+    }
 
     /** Mise à jour d'état d'un job d'impression. */
     data class JobUpdate(
@@ -159,13 +164,40 @@ class ThermalPrinterEngine(private val context: Context) {
         Logger.log("connect", "disconnected", mapOf("id" to printerId))
     }
 
-    /** Assure une connexion avant impression (cœur de la reconnexion auto). */
+    /**
+     * Assure une connexion avant impression (cœur de la reconnexion auto), avec
+     * **backoff exponentiel** : jusqu'à [RECONNECT_ATTEMPTS] tentatives espacées
+     * (300ms, 600ms, 1200ms…, plafonnées). Les erreurs non-retryables court-circuitent.
+     */
     private suspend fun ensureConnected(profile: PrinterProfile, timeoutMs: Long) {
         val adapter = adapterFor(profile)
             ?: throw PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Adapter introuvable")
         if (adapter.isConnected(profile.id)) return
-        Logger.log("connect", "auto-reconnect", mapOf("id" to profile.id))
-        withTimeout(timeoutMs) { adapter.connect(profile, timeoutMs) }
+
+        var backoff = 300L
+        var lastError: PrinterException? = null
+        for (attempt in 1..RECONNECT_ATTEMPTS) {
+            try {
+                Logger.log("connect", "auto-reconnect", mapOf("id" to profile.id, "attempt" to attempt))
+                withTimeout(timeoutMs) { adapter.connect(profile, timeoutMs) }
+                if (adapter.isConnected(profile.id)) {
+                    if (attempt > 1) Logger.log("connect", "reconnect-recovered", mapOf("id" to profile.id, "attempt" to attempt))
+                    return
+                }
+                lastError = PrinterException(ErrorCode.CONNECTION_FAILED, "Connexion non établie", retryable = true)
+            } catch (e: PrinterException) {
+                lastError = e
+                if (!e.retryable) throw e
+            } catch (e: Exception) {
+                lastError = PrinterException(ErrorCode.CONNECTION_FAILED, "Reconnexion échouée", e.message, retryable = true)
+            }
+            if (attempt < RECONNECT_ATTEMPTS) {
+                Logger.log("connect", "backoff", mapOf("id" to profile.id, "delayMs" to backoff))
+                delay(backoff)
+                backoff = (backoff * 2).coerceAtMost(3000L)
+            }
+        }
+        throw lastError ?: PrinterException(ErrorCode.CONNECTION_FAILED, "Reconnexion échouée ($RECONNECT_ATTEMPTS tentatives)", retryable = true)
     }
 
     // -------------------------------------------------------------------------
@@ -263,7 +295,19 @@ class ThermalPrinterEngine(private val context: Context) {
 
             emitJob(jobId, profile.id, "printing", progress = 0.1)
             val bytes = withTimeout(req.timeoutMs) {
-                adapter.printItems(profile, req.items, req.defaultCodePage, req.cut, req.feedLines)
+                if (adapter.supportsTextItems()) {
+                    adapter.printItems(profile, req.items, req.defaultCodePage, req.cut, req.feedLines)
+                } else {
+                    // Repli : rendre les items en image puis imprimer via le SDK image (Brother/Zebra).
+                    val width = profile.capabilities.printableDots.takeIf { it > 0 } ?: 576
+                    val bmp = TextRasterizer.render(req.items, width)
+                    val render = RenderOptions(widthDots = width, resize = false, cut = req.cut, feedLines = req.feedLines)
+                    try {
+                        adapter.printBitmap(profile, bmp, render)
+                    } finally {
+                        bmp.recycle()
+                    }
+                }
             }
             val status = runCatching { adapter.getStatus(profile) }.getOrNull()
             val duration = System.currentTimeMillis() - started
@@ -337,17 +381,25 @@ class ThermalPrinterEngine(private val context: Context) {
         val interval = intervalMs.coerceIn(1000L, 300_000L)
         monitors[printerId] = monitorScope.launch {
             var lastKey: String? = null
+            var lastBlocked = false
             while (isActive) {
                 val status = runCatching { getStatus(printerId) }.getOrElse { e ->
                     val code = (e as? PrinterException)?.code
                     PrinterStatus(printerId, "error", online = false, paper = "unknown", errorCode = code, rawStatus = e.message)
                 }
+                // "Bloqué" = condition qui mettrait un job en hold (papier/capot/offline).
+                val blocked = status.paper == "empty" || status.coverOpen == true || !status.online
                 val key = "${status.connection}|${status.online}|${status.paper}|${status.coverOpen}|${status.errorCode}"
                 if (key != lastKey) {
                     lastKey = key
                     onStatusChange?.invoke(status)
+                    if (lastBlocked && !blocked) {
+                        // Reprise après hold détectée (papier rechargé / capot fermé / retour online).
+                        Logger.log("status", "recovered", mapOf("id" to printerId))
+                    }
                     Logger.log("status", "change", mapOf("id" to printerId, "paper" to status.paper, "conn" to status.connection))
                 }
+                lastBlocked = blocked
                 delay(interval)
             }
         }

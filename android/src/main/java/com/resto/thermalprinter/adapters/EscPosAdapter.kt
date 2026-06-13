@@ -40,6 +40,8 @@ class EscPosAdapter(
 
     override fun isAvailable(): Boolean = true // pas de SDK requis
 
+    override fun supportsTextItems(): Boolean = true
+
     override suspend fun discover(timeoutMs: Long, onFound: (DiscoveredPrinter) -> Unit) {
         // Délégué aux scanners génériques (voir DiscoveryManager). No-op ici.
     }

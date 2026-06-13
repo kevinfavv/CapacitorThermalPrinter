@@ -40,6 +40,14 @@ interface PrinterAdapter {
     /** Indique si cet adapter sait gérer ce profil (transport + identité). */
     fun canHandle(profile: PrinterProfile): Boolean
 
+    /**
+     * True si l'adapter sait imprimer des items texte NATIVEMENT (encodeur ESC/POS
+     * ou builder texte du SDK). Si false, le moteur effectue un repli automatique :
+     * il rend les items en image (TextRasterizer) puis appelle [printBitmap].
+     * Voir docs/SDK_INTEGRATION.md (printText sur marques SDK).
+     */
+    fun supportsTextItems(): Boolean = false
+
     /** Ouvre une connexion. Idempotent : ne rien faire si déjà connecté. */
     suspend fun connect(profile: PrinterProfile, timeoutMs: Long)
 

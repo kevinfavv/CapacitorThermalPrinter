@@ -29,6 +29,21 @@ retombe sur l'ESC/POS générique (TCP/Bluetooth/USB/BLE).
 
 ---
 
+## Liens de téléchargement officiels
+
+| Marque | Page de téléchargement / SDK | Notes |
+|---|---|---|
+| **Star** | Android : [StarXpand-SDK-Android](https://github.com/star-micronics/StarXpand-SDK-Android) (Maven Central `com.starmicronics:stario10`) · iOS : [StarXpand-SDK-iOS](https://github.com/star-micronics/StarXpand-SDK-iOS) (SPM) | [Doc/manuel StarXpand](https://www.star-m.jp/products/s_print/sdk/starxpand/manual/en/index.html) |
+| **Epson** | [Epson Developers – POS products](https://epson.com/developers-products) · [ePOS SDK (référence)](https://download4.epson.biz/sec_pubs/pos/reference_en/technology/epson_epos_sdk.html) | iOS Bluetooth MFi : voir [MFi / ePOS SDK support](https://global.epson.com/products_and_drivers/tm/en/mfi.html) (compte + acceptation licence) |
+| **Brother** | [Mobile SDK – téléchargement](https://support.brother.com/g/s/es/dev/en/mobilesdk/download/index.html) · US : [Brother Developer Program](https://developerprogram.brother-usa.com/sdk-download) | iOS : pod [BRLMPrinterKit](https://cocoapods.org/pods/BRLMPrinterKit) · [Manuel SDK](https://support.brother.com/g/s/es/htmldoc/mobilesdk/) |
+| **Zebra** | [Link-OS Multiplatform SDK (portail dev)](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk) · [Téléchargements & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html) | [TechDocs Link-OS](https://techdocs.zebra.com/link-os/) (création d'un compte Zebra requise) |
+
+> Les téléchargements Epson / Brother / Zebra nécessitent un **compte développeur**
+> gratuit et l'**acceptation de la licence** du fabricant. Star ne nécessite rien
+> (Maven Central / SPM publics).
+
+---
+
 ## Où déposer les binaires (et ne JAMAIS les committer)
 
 Les binaires propriétaires sont **ignorés par git** (voir `.gitignore`). Pour
@@ -71,8 +86,9 @@ L'adapter `StarAdapter.swift` s'active via `#if canImport(StarIO10)`.
 ## 🟦 Brother
 
 ### Android (binaire manuel)
-1. Télécharger **Brother Print SDK v4** (`BrotherPrintLibrary.aar`) sur le portail
-   développeur Brother (acceptation de licence).
+1. Télécharger **Brother Print SDK v4** (`BrotherPrintLibrary.aar`) sur le
+   [portail Mobile SDK Brother](https://support.brother.com/g/s/es/dev/en/mobilesdk/download/index.html)
+   (ou [Brother Developer Program US](https://developerprogram.brother-usa.com/sdk-download)) — acceptation de licence.
 2. Le déposer dans l'app : `android/app/libs/BrotherPrintLibrary.aar`
 3. Dans le `build.gradle` de l'app :
    ```gradle
@@ -93,7 +109,8 @@ pod 'BRLMPrinterKit', '~> 4.12'
 ## 🟧 Epson (binaire manuel sur les 2 plateformes)
 
 ### Android
-1. Télécharger **ePOS SDK for Android** sur le portail Epson (acceptation de licence).
+1. Télécharger **ePOS SDK for Android** sur [Epson Developers](https://epson.com/developers-products)
+   ([réf. ePOS SDK](https://download4.epson.biz/sec_pubs/pos/reference_en/technology/epson_epos_sdk.html)) — acceptation de licence.
 2. Déposer `ePOS2.jar` dans `android/app/libs/` (+ les `.so` dans `src/main/jniLibs/` si fournis).
 3. Dans le `build.gradle` de l'app :
    ```gradle
@@ -107,7 +124,8 @@ pod 'BRLMPrinterKit', '~> 4.12'
 4. `EpsonAdapter.kt` (réflexion) s'active automatiquement.
 
 ### iOS
-1. Télécharger **ePOS SDK for iOS** sur le portail Epson.
+1. Télécharger **ePOS SDK for iOS** sur [Epson Developers](https://epson.com/developers-products)
+   (Bluetooth MFi : voir [support MFi / ePOS SDK](https://global.epson.com/products_and_drivers/tm/en/mfi.html)).
 2. Glisser `libepos2.xcframework` (+ `libeposeasyselect.xcframework` si fourni) dans
    le projet Xcode (target de l'app, *Embed & Sign*).
 3. `EpsonAdapter.swift` s'active via `#if canImport(libepos2)`.
@@ -134,11 +152,14 @@ Renseigner `zebraCoreId` / `zebraToken` dans `~/.gradle/gradle.properties`
 (obtenus avec un compte Zebra Core ID).
 
 ### Android — option B : binaire manuel
-Déposer `ZSDK_ANDROID_API.jar` (+ `ZSDK_ANDROID_BTLE.jar`) dans `android/app/libs/`
+Télécharger le [Link-OS Multiplatform SDK](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk),
+déposer `ZSDK_ANDROID_API.jar` (+ `ZSDK_ANDROID_BTLE.jar`) dans `android/app/libs/`
 puis `implementation files('libs/ZSDK_ANDROID_API.jar')`.
 
 ### iOS (xcframework manuel)
-1. Télécharger le **Link-OS Multiplatform SDK** (iOS) sur le portail Zebra.
+1. Télécharger le **Link-OS Multiplatform SDK** (iOS) sur le
+   [portail Zebra](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk)
+   ([téléchargements & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)).
 2. Glisser `ZSDK_API.xcframework` dans le projet Xcode (*Embed & Sign*).
 3. `ZebraAdapter.swift` s'active via `#if canImport(ZSDK_API)` (ajuster le nom de
    module si nécessaire).
@@ -191,6 +212,19 @@ StarAdapter().isAvailable()           // true si #if canImport(StarIO10)
 | **Brother** | `BRLMPrinterSearcher` | `driver.printImage(image, settings)` | settings (auto-cut) | `getPrinterStatus()` |
 | **Zebra Link-OS** | `NetworkDiscoverer`/`BluetoothDiscoverer` | `GraphicsUtil.printImage(…)` → **ZPL** | commande media | `getCurrentStatus()` |
 
-> Pour les marques SDK, le **chemin recommandé est `printImage`** (la réception est
-> rendue en bitmap par le pipeline image du plugin). `printText` reste optimal sur
-> les imprimantes **ESC/POS** (encodeur natif).
+### `printText` par marque
+
+`printText([...])` fonctionne sur **toutes** les marques :
+
+| Cible | Implémentation `printText` |
+|---|---|
+| ESC/POS (TCP/SPP/USB/BLE), **rawTcp** | encodeur ESC/POS natif (octets) |
+| **Star** (Android + iOS) | builder StarXpand natif (`actionPrintText`, QR, code-barres, cut) |
+| **Epson Android** | builder ePOS2 natif (`addText`/`addTextStyle`/`addSymbol`/`addBarcode`) |
+| **Epson iOS, Brother, Zebra** | **repli automatique en image** : les items sont rendus par `TextRasterizer` puis envoyés via `printImage` du SDK |
+
+Le routage est automatique via `supportsTextItems()` : si un adapter ne sait pas
+mapper le texte nativement, le moteur rend les items en bitmap (police monospace,
+alignement/gras/souligné/taille, séparateurs) et imprime en image. Les items
+QR/code-barres du repli image sont rendus en **texte** : pour un QR/code-barres
+précis sur Brother/Zebra, utiliser `printImage` avec un visuel pré-rendu.
