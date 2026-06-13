@@ -9,6 +9,8 @@ android/.gradle/
 android/local.properties
 android/libs/*.aar
 android/libs/*.jar
+android/libs/*.so
+android/libs/**/*.so
 .idea/
 *.iml
 
@@ -17,9 +19,13 @@ ios/Pods/
 ios/build/
 *.xcuserstate
 *.xcworkspace/xcuserdata/
+ios/Frameworks/
 
-# Vendor SDK (ne jamais committer les SDK propriétaires)
+# SDK fabricants propriétaires : NE JAMAIS committer (licences Epson/Brother/Zebra).
+# Déposer ici les binaires pour tester en local (dossier ignoré par git) :
+sdk-binaries/
 **/vendor-sdk/
+*.xcframework
 
 # Tests / coverage
 coverage/
