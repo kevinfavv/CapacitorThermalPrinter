@@ -6,6 +6,7 @@ import type {
   PrintImageOptions,
   PrintTextOptions,
 } from './core/options';
+import type { PrinterAdapterId, PrinterTransport } from './core/enums';
 import type {
   DiscoveredPrinter,
   PrinterProfile,
@@ -13,6 +14,29 @@ import type {
   PrintJobStatus,
   PrintResult,
 } from './core/models';
+
+/**
+ * État d'un adapter/SDK à l'instant présent (résultat de `getActiveSdks`).
+ */
+export interface SdkStatus {
+  /** Identifiant d'adapter (marque ou intégré). */
+  adapter: PrinterAdapterId;
+  /** Libellé lisible (ex. "Star StarXpand"). */
+  label: string;
+  /**
+   * `true` si le SDK/binaire est détecté et utilisable MAINTENANT.
+   * Pour les adapters intégrés (escpos, rawTcp) : toujours `true`.
+   * Pour les marques (star, epson, brother, zebra) : `true` si le SDK est lié.
+   */
+  available: boolean;
+  /**
+   * `true` si l'adapter dépend d'un SDK fabricant (à fournir), `false` s'il est
+   * intégré au plugin (ESC/POS générique, TCP brut, BLE, USB).
+   */
+  requiresSdk: boolean;
+  /** Transports gérés par cet adapter quand il est disponible. */
+  transports: PrinterTransport[];
+}
 
 /** Payload de l'event émis pendant un scan quand une imprimante est trouvée. */
 export interface PrinterFoundEvent {
@@ -114,6 +138,13 @@ export interface ThermalPrinterPlugin {
   /** Active/désactive le monitoring de statut en arrière-plan pour une imprimante. */
   startStatusMonitor(options: { printerId: string; intervalMs?: number }): Promise<void>;
   stopStatusMonitor(options: { printerId: string }): Promise<void>;
+
+  /**
+   * Retourne l'état, à l'instant présent, de chaque adapter/SDK : quels SDK
+   * fabricants sont actifs (binaire détecté) et quels adapters intégrés sont
+   * disponibles. Utile pour un écran de diagnostic ou pour adapter l'UI.
+   */
+  getActiveSdks(): Promise<{ sdks: SdkStatus[] }>;
 
   /** Récupère le journal de diagnostic en mémoire (support client). */
   getDebugLog(): Promise<{ log: DebugLogEntry[] }>;

@@ -263,6 +263,22 @@ final class ThermalPrinterEngine {
         all.values.forEach { $0.cancel() }
     }
 
+    /// État courant de chaque adapter/SDK (cf. getActiveSdks).
+    func activeSdks() -> [[String: Any]] {
+        let star = adapters.first { $0 is StarAdapter }?.isAvailable() ?? false
+        let epson = adapters.first { $0 is EpsonAdapter }?.isAvailable() ?? false
+        let brother = adapters.first { $0 is BrotherAdapter }?.isAvailable() ?? false
+        let zebra = adapters.first { $0 is ZebraAdapter }?.isAvailable() ?? false
+        return [
+            ["adapter": "escpos", "label": "ESC/POS générique", "available": true, "requiresSdk": false, "transports": ["wifi", "ethernet"]],
+            ["adapter": "star", "label": "Star StarXpand", "available": star, "requiresSdk": true, "transports": ["wifi", "bluetooth", "ble"]],
+            ["adapter": "epson", "label": "Epson ePOS2", "available": epson, "requiresSdk": true, "transports": ["wifi", "bluetooth"]],
+            ["adapter": "brother", "label": "Brother", "available": brother, "requiresSdk": true, "transports": ["wifi", "bluetooth", "ble"]],
+            ["adapter": "zebra", "label": "Zebra Link-OS", "available": zebra, "requiresSdk": true, "transports": ["wifi", "bluetooth"]],
+            ["adapter": "rawTcp", "label": "TCP brut", "available": true, "requiresSdk": false, "transports": ["wifi", "ethernet"]],
+        ]
+    }
+
     func debugLog() -> [[String: Any]] { Logger.shared.snapshot() }
 
     // MARK: Helpers

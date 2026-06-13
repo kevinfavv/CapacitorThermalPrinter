@@ -58,7 +58,7 @@
 - [ ] **Sécurité** : si credentials réseau un jour stockés → `EncryptedSharedPreferences` / Keychain.
 - [ ] **Annulation de job** (`cancelJob(jobId)`) + état `canceled` exposé.
 - [ ] **QR/code-barres de secours en image** pour les modèles sans support natif.
-- [ ] Remplacer le scope `@resto` / `your-org` par les valeurs réelles avant publication.
+- [ ] Renseigner l'URL `repository` (`your-org`) avant publication (scope npm = `@delicity`).
 
 ## Limites connues (par design)
 

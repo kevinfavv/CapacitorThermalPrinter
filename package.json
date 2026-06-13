@@ -1,5 +1,5 @@
 {
-  "name": "@resto/capacitor-thermal-printer",
+  "name": "@delicity/capacitor-thermal-printer",
   "version": "0.2.0",
   "description": "Plugin Capacitor d'impression thermique multi-marques (ESC/POS, Epson, Star, Brother, Zebra) par image, avec découverte agrégée et reconnexion automatique.",
   "main": "dist/plugin.cjs.js",
@@ -13,7 +13,7 @@
     "ios/Plugin/",
     "RestoThermalPrinter.podspec"
   ],
-  "author": "Resto",
+  "author": "Delicity",
   "license": "MIT",
   "repository": {
     "type": "git",

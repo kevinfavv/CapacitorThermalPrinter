@@ -280,6 +280,24 @@ class ThermalPrinterPlugin : Plugin() {
     }
 
     @PluginMethod
+    fun getActiveSdks(call: PluginCall) = exec(call) {
+        val arr = JSArray()
+        engine.activeSdks().forEach { s ->
+            val transports = JSArray()
+            s.transports.forEach { transports.put(it) }
+            arr.put(
+                JSObject()
+                    .put("adapter", s.adapter)
+                    .put("label", s.label)
+                    .put("available", s.available)
+                    .put("requiresSdk", s.requiresSdk)
+                    .put("transports", transports),
+            )
+        }
+        JSObject().put("sdks", arr)
+    }
+
+    @PluginMethod
     fun getDebugLog(call: PluginCall) {
         call.resolve(JSObject().put("log", engine.debugLog()))
     }

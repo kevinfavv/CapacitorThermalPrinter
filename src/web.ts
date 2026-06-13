@@ -102,6 +102,20 @@ export class ThermalPrinterWeb extends WebPlugin implements ThermalPrinterPlugin
     return;
   }
 
+  async getActiveSdks(): Promise<{ sdks: import('./definitions').SdkStatus[] }> {
+    // Aucun adapter natif n'est actif sur le web.
+    return {
+      sdks: [
+        { adapter: 'escpos', label: 'ESC/POS générique', available: false, requiresSdk: false, transports: ['wifi', 'ethernet', 'bluetooth', 'ble', 'usb'] },
+        { adapter: 'star', label: 'Star StarXpand', available: false, requiresSdk: true, transports: ['wifi', 'bluetooth', 'ble', 'usb'] },
+        { adapter: 'epson', label: 'Epson ePOS2', available: false, requiresSdk: true, transports: ['wifi', 'bluetooth', 'usb'] },
+        { adapter: 'brother', label: 'Brother', available: false, requiresSdk: true, transports: ['wifi', 'bluetooth', 'ble'] },
+        { adapter: 'zebra', label: 'Zebra Link-OS', available: false, requiresSdk: true, transports: ['wifi', 'bluetooth'] },
+        { adapter: 'rawTcp', label: 'TCP brut', available: false, requiresSdk: false, transports: ['wifi', 'ethernet'] },
+      ],
+    };
+  }
+
   async getDebugLog(): Promise<{ log: import('./definitions').DebugLogEntry[] }> {
     return { log: [] };
   }

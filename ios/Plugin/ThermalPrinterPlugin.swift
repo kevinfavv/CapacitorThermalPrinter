@@ -26,6 +26,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startStatusMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopStatusMonitor", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getActiveSdks", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getDebugLog", returnType: CAPPluginReturnPromise),
     ]
 
@@ -225,6 +226,10 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         engine.stopStatusMonitor(printerId)
         call.resolve()
+    }
+
+    @objc func getActiveSdks(_ call: CAPPluginCall) {
+        call.resolve(["sdks": engine.activeSdks()])
     }
 
     @objc func getDebugLog(_ call: CAPPluginCall) {

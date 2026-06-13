@@ -14,7 +14,7 @@ import {
   type PrintItem,
   type PrintJobStatusEvent,
   type StatusChangeEvent,
-} from '@resto/capacitor-thermal-printer';
+} from '@delicity/capacitor-thermal-printer';
 
 export class PrinterService {
   /** Étape "Ajouter une imprimante" : scanne et retourne la liste live. */

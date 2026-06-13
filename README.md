@@ -1,4 +1,4 @@
-# @resto/capacitor-thermal-printer
+# @delicity/capacitor-thermal-printer
 
 > Plugin Capacitor **7** d'impression thermique **multi-marques** (ESC/POS, Epson, Star, Brother, Zebra) **par image**, avec **découverte agrégée**, **dédoublonnage**, **reconnexion automatique** et **API JavaScript unique**.
 
@@ -11,17 +11,17 @@ Conçu pour la **restauration** : le commerçant clique sur « Ajouter une impri
 1. [Philosophie](#philosophie)
 2. [Architecture](#architecture)
 3. [Installation](#installation)
-4. [Permissions](#permissions)
-5. [API publique](#api-publique)
-6. [Types](#types)
-7. [Flux d'impression d'image](#flux-dimpression-dimage)
-8. [Conversion image → 1-bit & largeurs](#conversion-image--1-bit--largeurs)
-9. [Découverte agrégée & priorité d'adapter](#découverte-agrégée--priorité-dadapter)
-10. [Imprimante par défaut & reconnexion](#imprimante-par-défaut--reconnexion)
-11. [Erreurs normalisées](#erreurs-normalisées)
-12. [Différences Android / iOS](#différences-android--ios)
-13. [Cache image & logs/diagnostic](#cache-image--logsdiagnostic)
-14. [Intégration des SDK fabricants](#intégration-des-sdk-fabricants)
+4. [SDK fabricants](#sdk-fabricants)
+5. [Permissions](#permissions)
+6. [API publique](#api-publique)
+7. [Types](#types)
+8. [Flux d'impression d'image](#flux-dimpression-dimage)
+9. [Conversion image → 1-bit & largeurs](#conversion-image--1-bit--largeurs)
+10. [Découverte agrégée & priorité d'adapter](#découverte-agrégée--priorité-dadapter)
+11. [Imprimante par défaut & reconnexion](#imprimante-par-défaut--reconnexion)
+12. [Erreurs normalisées](#erreurs-normalisées)
+13. [Différences Android / iOS](#différences-android--ios)
+14. [Cache image & logs/diagnostic](#cache-image--logsdiagnostic)
 15. [Plan d'implémentation par phases](#plan-dimplémentation-par-phases)
 16. [Exemple complet](#exemple-complet)
 
@@ -106,11 +106,55 @@ capacitor-thermal-printer/
 ## Installation
 
 ```bash
-npm install @resto/capacitor-thermal-printer
+npm install @delicity/capacitor-thermal-printer
 npx cap sync
 ```
 
 **Prérequis Capacitor 7** : Android `compileSdk 35` / JDK 21 ; iOS 14+ / Xcode 16+.
+
+## SDK fabricants
+
+Le plugin gère **Star, Epson, Brother, Zebra** via leur SDK natif, **en option** :
+il compile et fonctionne **sans aucun SDK** (ESC/POS générique sur TCP/Bluetooth/
+USB/BLE), et chaque marque s'**active automatiquement** dès que son binaire est
+présent.
+
+> **Pourquoi ce n'est pas 100 % automatique au `npm install` ?**
+> Seuls les SDK publiés sur un dépôt de paquets standard se téléchargent seuls.
+> Les autres ne sont distribués que via le portail du fabricant et leur **licence
+> interdit la redistribution** — on ne peut donc ni les mettre sur Maven Central /
+> CocoaPods, ni les committer ici. L'app consommatrice les télécharge elle-même
+> (elle accepte la licence) ; le plugin fournit tout le code pour s'en servir.
+
+| Marque | Android | iOS | À faire dans l'app |
+|---|---|---|---|
+| **Star** | ✅ auto (Maven Central) | ✅ auto (SPM) | Ajouter le package SPM `StarXpand-SDK-iOS` (iOS). Android : rien. |
+| **Brother** | ⛔ `.aar` manuel | ✅ auto (CocoaPods) | `pod 'BRLMPrinterKit'` (iOS) ; déposer `BrotherPrintLibrary.aar` (Android). |
+| **Epson** | ⛔ `.jar`+`.so` manuel | ⛔ xcframework manuel | Déposer `ePOS2.jar` (Android) / `libepos2.xcframework` (iOS). |
+| **Zebra** | ⚠️ Maven privé (token) ou `.jar` | ⛔ xcframework manuel | Token Zebra ou `ZSDK_ANDROID_API.jar` ; `ZSDK_API.xcframework` (iOS). |
+
+Détails complets (où déposer chaque binaire, dépôt Maven privé Zebra, noms de
+modules iOS, dossier de test ignoré par git) : **[`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md)**.
+
+### Savoir quels SDK sont actifs (runtime)
+
+`getActiveSdks()` indique, à l'instant présent, quels adapters/SDK sont disponibles :
+
+```ts
+import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
+
+const { sdks } = await ThermalPrinter.getActiveSdks();
+// [
+//   { adapter: 'escpos', label: 'ESC/POS générique', available: true,  requiresSdk: false, transports: ['wifi','ethernet','bluetooth','usb'] },
+//   { adapter: 'star',   label: 'Star StarXpand',    available: true,  requiresSdk: true,  transports: ['wifi','bluetooth','ble','usb'] },
+//   { adapter: 'epson',  label: 'Epson ePOS2',       available: false, requiresSdk: true,  transports: ['wifi','bluetooth','usb'] },
+//   ...
+// ]
+const actifs = sdks.filter(s => s.available).map(s => s.label);
+```
+
+Utile pour un écran « Diagnostic imprimante » ou pour n'afficher que les marques
+réellement disponibles sur l'appareil.
 
 ## Permissions
 
@@ -153,7 +197,7 @@ Appeler `requestPermissions()` avant le premier scan.
 ## API publique
 
 ```ts
-import { ThermalPrinter } from '@resto/capacitor-thermal-printer';
+import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
 
 ThermalPrinter.discoverPrinters(options?)   // → { printers: DiscoveredPrinter[] }
 ThermalPrinter.connectPrinter({ printerId, timeoutMs?, forceAdapter?, setAsDefault? })  // → { connected }
@@ -168,6 +212,7 @@ ThermalPrinter.getPrinterStatus({ printerId? })                          // → 
 ThermalPrinter.requestPermissions() / checkPermissions()                 // → PermissionStatus
 ThermalPrinter.startStatusMonitor({ printerId, intervalMs? })            // Phase 6
 ThermalPrinter.stopStatusMonitor({ printerId })                          // Phase 6
+ThermalPrinter.getActiveSdks()                                           // → { sdks: SdkStatus[] }
 ThermalPrinter.getDebugLog()                                             // → { log: DebugLogEntry[] }
 
 // Events
@@ -546,7 +591,7 @@ Toutes les promesses rejetées portent un **code stable** (`error.code`) :
 `PRINTER_NOT_FOUND`, `PRINTER_OFFLINE`, `CONNECTION_FAILED`, `PERMISSION_DENIED`, `BLUETOOTH_DISABLED`, `WIFI_NOT_CONNECTED`, `PAIRING_REQUIRED`, `UNSUPPORTED_TRANSPORT`, `UNSUPPORTED_PRINTER`, `IMAGE_INVALID`, `IMAGE_TOO_LARGE`, `PRINT_FAILED`, `PAPER_EMPTY`, `COVER_OPEN`, `SDK_NOT_AVAILABLE`, `TIMEOUT`, `UNKNOWN`.
 
 ```ts
-import { PrinterError, PrintErrorCode } from '@resto/capacitor-thermal-printer';
+import { PrinterError, PrintErrorCode } from '@delicity/capacitor-thermal-printer';
 try { await ThermalPrinter.printImage({ image: { filePath } }); }
 catch (e) {
   const err = e as PrinterError; // { code, message, detail, retryable }
@@ -577,10 +622,6 @@ catch (e) {
 
 - **Cache** : les images `url` sont téléchargées dans `cache/thermal-images/` (clé = hash de l'URL, quota 32 Mo, purge LRU). Le mode `filePath` reste le plus fiable.
 - **Logs** : ring-buffer en mémoire (500 lignes) + Logcat/os_log. Récupérables via `getDebugLog()` pour un écran « Diagnostic » joignable au support. Jamais de données image brutes (seulement dimensions/octets).
-
-## Intégration des SDK fabricants
-
-Les adapters Epson/Star/Brother/Zebra sont **prêts à brancher** : `isAvailable()` détecte le SDK (réflexion `Class.forName` / `NSClassFromString`). Tant qu'un SDK est absent, son adapter est ignoré et le plugin **retombe sur ESC/POS** si l'imprimante répond en TCP. Voir [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
 
 ## Tests & qualité
 
@@ -617,7 +658,7 @@ Voir [`ROADMAP.md`](ROADMAP.md) pour le détail de ce qu'il reste à faire.
 ## Exemple complet
 
 ```ts
-import { ThermalPrinter, PrinterError } from '@resto/capacitor-thermal-printer';
+import { ThermalPrinter, PrinterError } from '@delicity/capacitor-thermal-printer';
 
 // 1) Découverte (avec résultats incrémentaux)
 const sub = await ThermalPrinter.addListener('printerFound', e => {

@@ -365,6 +365,41 @@ class ThermalPrinterEngine(private val context: Context) {
         monitors.clear()
     }
 
+    // -------------------------------------------------------------------------
+    // État des SDK / adapters à l'instant présent
+    // -------------------------------------------------------------------------
+
+    data class SdkInfo(
+        val adapter: String,
+        val label: String,
+        val available: Boolean,
+        val requiresSdk: Boolean,
+        val transports: List<String>,
+    )
+
+    /** Retourne l'état courant de chaque adapter/SDK (cf. getActiveSdks). */
+    fun activeSdks(): List<SdkInfo> {
+        val star = adapters.firstOrNull { it is StarAdapter }
+        val epson = adapters.firstOrNull { it is EpsonAdapter }
+        val brother = adapters.firstOrNull { it is BrotherAdapter }
+        val zebra = adapters.firstOrNull { it is ZebraAdapter }
+        val ble = adapters.firstOrNull { it is BleAdapter }
+        val usb = adapters.firstOrNull { it is UsbAdapter }
+        val escTransports = buildList {
+            add("wifi"); add("ethernet"); add("bluetooth")
+            if (ble?.isAvailable() == true) add("ble")
+            if (usb?.isAvailable() == true) add("usb")
+        }
+        return listOf(
+            SdkInfo("escpos", "ESC/POS générique", true, false, escTransports),
+            SdkInfo("star", "Star StarXpand", star?.isAvailable() == true, true, listOf("wifi", "bluetooth", "ble", "usb")),
+            SdkInfo("epson", "Epson ePOS2", epson?.isAvailable() == true, true, listOf("wifi", "bluetooth", "usb")),
+            SdkInfo("brother", "Brother", brother?.isAvailable() == true, true, listOf("wifi", "bluetooth", "ble")),
+            SdkInfo("zebra", "Zebra Link-OS", zebra?.isAvailable() == true, true, listOf("wifi", "bluetooth")),
+            SdkInfo("rawTcp", "TCP brut", true, false, listOf("wifi", "ethernet")),
+        )
+    }
+
     fun debugLog() = Logger.snapshot()
 
     // -------------------------------------------------------------------------
