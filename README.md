@@ -4,6 +4,8 @@
 
 For **any Capacitor app that needs to print** — point of sale, receipts, order tickets, shipping/label printing, kitchen slips, etc. The user taps "Add a printer", picks one from a list, runs a test print, and never has to touch the phone's Bluetooth/Wi-Fi settings again.
 
+**Requires Capacitor 7** · Android (`compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
+
 ---
 
 ## Contents
@@ -22,8 +24,7 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
 12. [Normalized errors](#normalized-errors)
 13. [Android / iOS differences](#android--ios-differences)
 14. [Image cache & logs/diagnostics](#image-cache--logsdiagnostics)
-15. [Implementation phases](#implementation-phases)
-16. [Full example](#full-example)
+15. [Full example](#full-example)
 
 ---
 
@@ -62,47 +63,8 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
    └────────────────────────────────────────────────────────┘
 ```
 
-### Folder structure
-
-```
-capacitor-thermal-printer/
-├── src/                                  # Public TypeScript API
-│   ├── index.ts                          # registerPlugin + exports
-│   ├── definitions.ts                    # native contract (plugin interface)
-│   ├── web.ts                            # web fallback (dev UI)
-│   ├── core/
-│   │   ├── enums.ts                      # transports, adapters, error codes
-│   │   ├── models.ts                     # DiscoveredPrinter, PrinterProfile, Status…
-│   │   ├── options.ts                    # discover/print/connect options
-│   │   ├── errors.ts                     # PrinterError + normalization
-│   │   └── imaging.ts                    # ESC/POS raster spec + dithering (TS ref.)
-│   └── adapters/
-│       ├── priority.ts                   # adapter priority engine
-│       └── dedup.ts                       # stable id + duplicate merging
-├── android/src/main/java/com/delicity/thermalprinter/
-│   ├── ThermalPrinterPlugin.kt           # Capacitor bridge
-│   ├── ThermalPrinterEngine.kt           # orchestration
-│   ├── Logger.kt
-│   ├── adapters/  (PrinterAdapter, EscPos, Epson, Star, Brother, Zebra, RawTcp, Ble, Usb)
-│   ├── transport/ (ByteTransport, TcpTransport, BluetoothSppTransport, BleGattClient)
-│   ├── discovery/ (DiscoveryManager, TcpScanner, BluetoothClassicScanner, BleScanner, AdapterPriority)
-│   ├── image/     (ImageProcessor, ImageCache, TextRasterizer)
-│   ├── store/     (PrinterStore)
-│   └── model/     (Models.kt)
-├── ios/Plugin/
-│   ├── ThermalPrinterPlugin.swift + .m   # Capacitor bridge
-│   ├── ThermalPrinterEngine.swift
-│   ├── Logger.swift
-│   ├── Adapters/  (PrinterAdapter, EscPos, Epson, Star, Brother, Zebra, RawTcp)
-│   ├── Transport/ (TcpTransport — Network.framework)
-│   ├── Discovery/ (DiscoveryManager, BonjourScanner, AdapterPriority)
-│   ├── Image/     (ImageProcessor, ImageCache, TextRasterizer)
-│   ├── Store/     (PrinterStore)
-│   └── Model/     (Models.swift)
-└── docs/
-    ├── SDK_INTEGRATION.md
-    └── TESTING_SDK.md
-```
+> 📁 Repo layout, internal architecture, tests and the contribution guide live in
+> [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Installation
 
@@ -647,44 +609,8 @@ catch (e) {
 - **Cache**: `url` images are downloaded into `cache/thermal-images/` (key = URL hash, 32 MB quota, LRU eviction). The `filePath` mode remains the most reliable.
 - **Logs**: in-memory ring buffer (500 lines) + Logcat/os_log. Retrievable via `getDebugLog()` for a "Diagnostics" screen attachable to support tickets. Never raw image data (only dimensions/byte counts).
 
-## Tests & quality
-
-- **TypeScript (Vitest)**: the pure business logic (imaging, ESC/POS text encoder,
-  adapter priority, deduplication, errors, web fallback) is covered by **66 tests**
-  with **~94% coverage** (CI thresholds: 85% lines/functions, 80% branches).
-
-  ```bash
-  npm test            # run the Vitest suite
-  npm run test:coverage
-  ```
-
-- **Android (JUnit)**: `android/src/test/...` validates the ESC/POS text and raster
-  encoders (same byte-for-byte assertions as the TS tests) → `./gradlew test`.
-- **SDK connection coverage**: the reflection-based adapters (Epson/Zebra/Brother) are
-  covered via a **fake SDK on the test classpath** (Robolectric, no binary or printer) +
-  JaCoCo. Example provided for Epson (`EpsonAdapterTest`, `SdkReflectTest`).
-  → `./gradlew testDebugUnitTest jacocoTestReport`. See **[`docs/TESTING_SDK.md`](docs/TESTING_SDK.md)**.
-- **iOS (XCTest)**: `ios/Tests/...` validates the encoder (same vectors) → `xcodebuild test`.
-- **SDK integration tests** (layer 3): on real hardware once the SDKs are linked (see ROADMAP).
-
-## Implementation phases
-
-Legend: ✅ done & verifiable (TS/transports/plugin logic) · ✅◷ implemented, **needs on-device validation** (native SDK code not compiled in this repo) · 🟡 partial.
-
-| Phase | Content | Status |
-|---|---|---|
-| **1** | Plugin scaffold, TS types, adapter registry, default-printer store, **ESC/POS over Wi-Fi TCP 9100** | ✅ |
-| **2** | **Android Bluetooth Classic** (SPP) for ESC/POS | ✅ |
-| **3** | **Star SDK** (auto-download Maven/SPM, typed calls) **+ Epson** (Android reflection / iOS `canImport`) | ✅ Star · ✅◷ Epson |
-| **4** | **iOS**: Wi-Fi TCP + Star/Epson SDK; **BLE via MFi SDK** (no generic GATT exposed) | ✅ |
-| **5** | **Brother + Zebra** (Android reflection / iOS `canImport`; Brother iOS via pod) | ✅◷ |
-| **6** | **Monitoring** (`start/stopStatusMonitor`) + **backoff reconnection** + **hold recovery** + logs/events | ✅ |
-| **+** | **Android transports**: **BLE GATT** (MTU, UUID allowlist) + **USB host** (bulk OUT) | ✅◷ |
-| **+** | **Styled `printText`**: native ESC/POS + **Star** native + **Epson Android** native; **Brother/Zebra/Epson-iOS → image fallback** (`TextRasterizer`) | ✅ |
-| **+** | **`getActiveSdks()`** (active SDKs at runtime) + **job events** | ✅ |
-| **+** | **Tests**: TS ~94% · SDK connection coverage via **fake SDK** (Epson) + JaCoCo · reflection contract | ✅ TS · 🟡 native partial |
-
-See [`ROADMAP.md`](ROADMAP.md) for details and [`docs/TESTING_SDK.md`](docs/TESTING_SDK.md) for the testing strategy.
+> Implementation status, tests and development setup live in
+> [`CONTRIBUTING.md`](CONTRIBUTING.md) · roadmap in [`ROADMAP.md`](ROADMAP.md).
 
 ## Full example
 
