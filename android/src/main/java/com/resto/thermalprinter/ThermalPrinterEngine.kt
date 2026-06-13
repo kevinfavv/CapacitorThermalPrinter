@@ -4,6 +4,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.graphics.Bitmap
+import com.resto.thermalprinter.adapters.BleAdapter
 import com.resto.thermalprinter.adapters.BrotherAdapter
 import com.resto.thermalprinter.adapters.EpsonAdapter
 import com.resto.thermalprinter.adapters.EscPosAdapter
@@ -23,7 +24,16 @@ import com.resto.thermalprinter.model.PrinterException
 import com.resto.thermalprinter.model.PrinterProfile
 import com.resto.thermalprinter.model.PrinterStatus
 import com.resto.thermalprinter.model.RenderOptions
+import com.resto.thermalprinter.model.Transport
 import com.resto.thermalprinter.store.PrinterStore
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 
 /**
@@ -55,6 +65,7 @@ class ThermalPrinterEngine(private val context: Context) {
             EscPosAdapter(btAdapter),
             RawTcpAdapter(),
             UsbAdapter(context),
+            BleAdapter(context),
         )
     }
 
@@ -63,6 +74,13 @@ class ThermalPrinterEngine(private val context: Context) {
 
     /** Émetteur d'états de job (branché par le plugin sur notifyListeners). */
     var onJobUpdate: ((JobUpdate) -> Unit)? = null
+
+    /** Émetteur de changement de statut (branché par le plugin sur 'statusChange'). */
+    var onStatusChange: ((PrinterStatus) -> Unit)? = null
+
+    /** Scope + registre des moniteurs de statut actifs (Phase 6). */
+    private val monitorScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val monitors = ConcurrentHashMap<String, Job>()
 
     /** Mise à jour d'état d'un job d'impression. */
     data class JobUpdate(
@@ -102,7 +120,8 @@ class ThermalPrinterEngine(private val context: Context) {
         val defaultId = store.getDefault()?.id
         printers.forEach { p ->
             p.isDefault = p.id == defaultId
-            p.isConnected = adapterFor(p.adapter)?.isConnected(p.id) == true
+            val adapter = if (p.adapter == AdapterId.ESCPOS) escFamilyFor(p.transport) else adapterFor(p.adapter)
+            p.isConnected = adapter?.isConnected(p.id) == true
         }
         lastDiscovered = printers
         Logger.log("discovery", "complete", mapOf("count" to printers.size, "failed" to failed.joinToString()))
@@ -115,7 +134,7 @@ class ThermalPrinterEngine(private val context: Context) {
 
     suspend fun connect(printerId: String, timeoutMs: Long, forceAdapter: AdapterId?, setAsDefault: Boolean = false): Boolean {
         val profile = resolveProfile(printerId, forceAdapter)
-        val adapter = adapterFor(profile.adapter)
+        val adapter = adapterFor(profile)
             ?: throw PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Aucun adapter pour ${profile.adapter.value}")
         if (!adapter.isAvailable()) {
             throw PrinterException(ErrorCode.SDK_NOT_AVAILABLE, "Adapter ${profile.adapter.value} indisponible")
@@ -135,14 +154,14 @@ class ThermalPrinterEngine(private val context: Context) {
 
     suspend fun disconnect(printerId: String) {
         val profile = store.get(printerId) ?: lastDiscovered.firstOrNull { it.id == printerId }?.let(::toEphemeralProfile)
-        val adapter = profile?.let { adapterFor(it.adapter) } ?: return
+        val adapter = profile?.let { adapterFor(it) } ?: return
         adapter.disconnect(printerId)
         Logger.log("connect", "disconnected", mapOf("id" to printerId))
     }
 
     /** Assure une connexion avant impression (cœur de la reconnexion auto). */
     private suspend fun ensureConnected(profile: PrinterProfile, timeoutMs: Long) {
-        val adapter = adapterFor(profile.adapter)
+        val adapter = adapterFor(profile)
             ?: throw PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Adapter introuvable")
         if (adapter.isConnected(profile.id)) return
         Logger.log("connect", "auto-reconnect", mapOf("id" to profile.id))
@@ -189,7 +208,7 @@ class ThermalPrinterEngine(private val context: Context) {
 
         val profile = resolveTargetProfile(req.printerId)
         emitJob(jobId, profile.id, "pending")
-        val adapter = adapterFor(profile.adapter)
+        val adapter = adapterFor(profile)
             ?: throw failJob(jobId, profile.id, PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Adapter introuvable"))
 
         try {
@@ -232,7 +251,7 @@ class ThermalPrinterEngine(private val context: Context) {
 
         val profile = resolveTargetProfile(req.printerId)
         emitJob(jobId, profile.id, "pending")
-        val adapter = adapterFor(profile.adapter)
+        val adapter = adapterFor(profile)
             ?: throw failJob(jobId, profile.id, PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Adapter introuvable"))
 
         try {
@@ -299,9 +318,51 @@ class ThermalPrinterEngine(private val context: Context) {
 
     suspend fun getStatus(printerId: String?): PrinterStatus {
         val profile = resolveTargetProfile(printerId)
-        val adapter = adapterFor(profile.adapter)
+        val adapter = adapterFor(profile)
             ?: throw PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Adapter introuvable")
         return adapter.getStatus(profile)
+    }
+
+    // -------------------------------------------------------------------------
+    // Monitoring de statut (Phase 6)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Démarre un polling périodique du statut de [printerId] et émet `statusChange`
+     * uniquement quand l'état pertinent change (connexion/online/papier/capot).
+     * Idempotent : relance le moniteur si déjà actif.
+     */
+    fun startStatusMonitor(printerId: String, intervalMs: Long) {
+        stopStatusMonitor(printerId)
+        val interval = intervalMs.coerceIn(1000L, 300_000L)
+        monitors[printerId] = monitorScope.launch {
+            var lastKey: String? = null
+            while (isActive) {
+                val status = runCatching { getStatus(printerId) }.getOrElse { e ->
+                    val code = (e as? PrinterException)?.code
+                    PrinterStatus(printerId, "error", online = false, paper = "unknown", errorCode = code, rawStatus = e.message)
+                }
+                val key = "${status.connection}|${status.online}|${status.paper}|${status.coverOpen}|${status.errorCode}"
+                if (key != lastKey) {
+                    lastKey = key
+                    onStatusChange?.invoke(status)
+                    Logger.log("status", "change", mapOf("id" to printerId, "paper" to status.paper, "conn" to status.connection))
+                }
+                delay(interval)
+            }
+        }
+        Logger.log("status", "monitor-start", mapOf("id" to printerId, "intervalMs" to interval))
+    }
+
+    /** Arrête le moniteur d'une imprimante (no-op si absent). */
+    fun stopStatusMonitor(printerId: String) {
+        monitors.remove(printerId)?.cancel()
+    }
+
+    /** Arrête tous les moniteurs (à l'arrêt du plugin). */
+    fun stopAllMonitors() {
+        monitors.values.forEach { it.cancel() }
+        monitors.clear()
     }
 
     fun debugLog() = Logger.snapshot()
@@ -317,6 +378,19 @@ class ThermalPrinterEngine(private val context: Context) {
         AdapterId.BROTHER -> adapters.firstOrNull { it is BrotherAdapter }
         AdapterId.ZEBRA -> adapters.firstOrNull { it is ZebraAdapter }
         AdapterId.RAW_TCP -> adapters.firstOrNull { it is RawTcpAdapter }
+    }
+
+    /**
+     * Résolution transport-aware : la famille ESC/POS (escpos) regroupe 3 adapters
+     * distincts (TCP/SPP, USB, BLE) qui ne se différencient que par le transport.
+     */
+    private fun adapterFor(profile: PrinterProfile): PrinterAdapter? =
+        if (profile.adapter == AdapterId.ESCPOS) escFamilyFor(profile.transport) else adapterFor(profile.adapter)
+
+    private fun escFamilyFor(transport: Transport): PrinterAdapter? = when (transport) {
+        Transport.USB -> adapters.firstOrNull { it is UsbAdapter }
+        Transport.BLE -> adapters.firstOrNull { it is BleAdapter }
+        else -> adapters.firstOrNull { it is EscPosAdapter }
     }
 
     private fun resolveTargetProfile(printerId: String?): PrinterProfile {

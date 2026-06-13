@@ -51,24 +51,43 @@ repositories {
     google()
     mavenCentral()
     flatDir {
-        // SDK fabricants livrés en .aar (Epson ePOS2, StarIO10, Brother, Zebra Link-OS)
-        // à déposer dans android/libs/. Voir docs/SDK_INTEGRATION.md
+        // SDK fabricants livrés en .aar/.jar manuel (Epson ePOS2, Brother, Zebra Link-OS)
+        // à déposer dans android/libs/ (binaires NON committés). Voir docs/SDK_INTEGRATION.md
         dirs 'libs'
     }
+    // ---- Zebra Link-OS : dépôt Maven PRIVÉ Zebra (credentials requis) ----
+    // Décommenter + renseigner zebraCoreId / zebraToken dans gradle.properties pour
+    // activer l'auto-download de Zebra. Voir docs/SDK_INTEGRATION.md (§ Zebra).
+    // maven {
+    //     url "https://artifactory-us.zebra.com/artifactory/dmo-mvn-rel/"
+    //     credentials {
+    //         username = project.findProperty('zebraCoreId') ?: ''
+    //         password = project.findProperty('zebraToken') ?: ''
+    //     }
+    // }
 }
 
 dependencies {
-    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation fileTree(include: ['*.jar', '*.aar'], dir: 'libs')
     implementation project(':capacitor-android')
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 
-    // ---- SDK fabricants : décommenter quand les .aar sont fournis ----
-    // implementation(name: 'ePOS2', ext: 'aar')              // Epson ePOS2
-    // implementation 'com.starmicronics:stario10:1.6.0'      // Star (si dispo Maven)
-    // implementation(name: 'StarIO10', ext: 'aar')           // Star (aar local)
-    // implementation(name: 'BrotherPrintLibrary', ext: 'aar')// Brother
-    // implementation(name: 'ZSDK_ANDROID_API', ext: 'aar')   // Zebra Link-OS
+    // ---- Star StarXpand : SEUL SDK 100% auto-download (Maven Central, sans licence gate) ----
+    // L'adapter Star utilise des appels TYPÉS (compilation directe contre ces classes).
+    // Pour désactiver Star (réduire la taille), commenter cette ligne ET StarAdapter sera
+    // ignoré (isAvailable()=false via réflexion). Version à réactualiser au besoin.
+    implementation "com.starmicronics:stario10:1.12.1"
+
+    // ---- Epson / Brother / Zebra : binaires MANUELS (license-gated, non redistribuables) ----
+    // Les adapters correspondants utilisent la RÉFLEXION : le plugin compile/s'installe SANS
+    // ces binaires, et chaque adapter s'active automatiquement si le binaire est présent.
+    // Déposer les fichiers dans android/libs/ (voir docs/SDK_INTEGRATION.md) :
+    //   • Epson  : ePOS2.jar    (portail Epson)
+    //   • Brother: BrotherPrintLibrary.aar (portail Brother)
+    //   • Zebra  : ZSDK_ANDROID_API.jar (portail Zebra) — ou dépôt Maven privé ci-dessus.
+    // Aucune ligne `implementation` n'est requise pour eux : fileTree(libs) ci-dessus suffit
+    // à les embarquer dans l'app consommatrice quand ils sont présents.
 
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"

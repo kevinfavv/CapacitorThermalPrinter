@@ -54,6 +54,10 @@ class ThermalPrinterPlugin : Plugin() {
             u.message?.let { job.put("message", it) }
             notifyListeners("printJobStatus", JSObject().put("job", job))
         }
+        // Relaye les changements de statut vers le JS (event statusChange).
+        engine.onStatusChange = { status ->
+            notifyListeners("statusChange", JSObject().put("status", status.toJson()))
+        }
         Logger.log("plugin", "loaded")
     }
 
@@ -260,12 +264,20 @@ class ThermalPrinterPlugin : Plugin() {
 
     @PluginMethod
     fun startStatusMonitor(call: PluginCall) = exec(call) {
-        // TODO Phase 6 : démarrer un polling périodique qui émet 'statusChange'.
+        val printerId = call.getString("printerId")
+            ?: throw PrinterException(com.resto.thermalprinter.model.ErrorCode.PRINTER_NOT_FOUND, "printerId requis")
+        val interval = (call.getInt("intervalMs")?.toLong()) ?: 5000L
+        engine.startStatusMonitor(printerId, interval)
         JSObject()
     }
 
     @PluginMethod
-    fun stopStatusMonitor(call: PluginCall) = exec(call) { JSObject() }
+    fun stopStatusMonitor(call: PluginCall) = exec(call) {
+        val printerId = call.getString("printerId")
+            ?: throw PrinterException(com.resto.thermalprinter.model.ErrorCode.PRINTER_NOT_FOUND, "printerId requis")
+        engine.stopStatusMonitor(printerId)
+        JSObject()
+    }
 
     @PluginMethod
     fun getDebugLog(call: PluginCall) {
@@ -298,6 +310,7 @@ class ThermalPrinterPlugin : Plugin() {
 
     override fun handleOnDestroy() {
         super.handleOnDestroy()
+        engine.stopAllMonitors()
         scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     }
 }

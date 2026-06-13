@@ -97,11 +97,15 @@ class DiscoveryManager(
             }
         }
 
-        // --- Source BLE (optionnelle) ---
-        // if (enabled("ble") && btAdapter != null) {
-        //     jobs += async { runCatching { BleScanner(context, btAdapter).scan(options.timeoutMs, collect) }
-        //         .onFailure { failed.add("ble") }; Unit }
-        // }
+        // --- Source BLE (allowlist de services "UART série") ---
+        if (enabled("ble") && btAdapter != null) {
+            jobs += async {
+                runCatching {
+                    BleScanner(context, btAdapter).scan(options.timeoutMs, collect)
+                }.onFailure { failed.add("ble") }
+                Unit
+            }
+        }
 
         jobs.awaitAll()
 

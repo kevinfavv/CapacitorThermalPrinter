@@ -23,29 +23,34 @@
 
 - **Fin d'impression physique** : fiable via SDK ; best-effort (flush) en ESC/POS
   unidirectionnel. Améliorer en lisant le statut post-job quand le transport le permet.
-- **`statusChange`** : émis lors des opérations ; le monitoring périodique
-  (`startStatusMonitor`) reste un stub (Phase 6).
 
-## À brancher (SDK fabricants) 🔌
+## SDK fabricants — intégrés ✅ (à vérifier sur device avec binaire)
 
-> Pseudo-code déjà présent dans chaque adapter ; activer après dépôt des SDK
-> (voir `docs/SDK_INTEGRATION.md`).
+> Architecture : Star = dépendance auto (Maven/SPM, code typé) ; Epson/Zebra/Brother
+> = activation auto si binaire présent (Android réflexion · iOS `#if canImport`).
+> Détails et installation : `docs/SDK_INTEGRATION.md`. Le code natif n'est pas
+> compilé dans ce dépôt (binaires non redistribuables) -> **tester sur device**.
 
-- [ ] **Epson ePOS2** (Android + iOS) : discovery, connect, `addImage`, builder texte, statut, cut, drawer.
-- [ ] **Star StarXpand** (Android + iOS) : discovery, `actionPrintImage` + builder texte, statut.
-- [ ] **Brother** (Android + iOS) : recherche réseau/BLE, `printImage`, settings modèles QL/TD/RJ.
-- [ ] **Zebra Link-OS** (Android + iOS) : discovery, conversion image → ZPL/CPCL, statut. (Jamais ESC/POS.)
-- [ ] Mapping `printText` → builder de chaque SDK (les styles non supportés sont déjà ignorés proprement).
+- [x] **Star StarXpand** (Android + iOS) : discovery, connect, `actionPrintImage`, builder texte, cut, drawer, statut. **Auto-download.**
+- [x] **Epson ePOS2** (Android réflexion + iOS canImport) : discovery, connect, `addImage`, cut, drawer, statut.
+- [x] **Brother** (Android réflexion + iOS pod) : recherche réseau, `printImage`, settings par modèle.
+- [x] **Zebra Link-OS** (Android réflexion + iOS canImport) : discovery, image → ZPL, statut. (Jamais ESC/POS.)
+- [ ] Mapping `printText` → builder Epson/Brother/Zebra (Star fait ; sinon utiliser `printImage`).
 
-## À finaliser (transports) 🔌
+## Transports — finalisés ✅
 
-- [ ] **BLE GATT** (Android + iOS) : négociation MTU, écriture par paquets, **allowlist d'UUID** par modèle validé.
-- [ ] **USB host Android** : permission runtime + transfert bulk sur l'endpoint OUT.
+- [x] **BLE GATT** (Android) : connexion GATT, négociation MTU, écriture par paquets, **allowlist d'UUID** (`BleGattClient`), scan BLE filtré.
+- [x] **USB host Android** : permission runtime + claimInterface + transfert bulk sur l'endpoint OUT.
+- [ ] **BLE iOS** : via SDK MFi (Star/Epson/Brother) ; pas de GATT générique exposé par le plugin.
+
+## Monitoring — fait ✅
+
+- [x] **Phase 6** : `startStatusMonitor`/`stopStatusMonitor` (Android + iOS), polling
+      périodique + émission `statusChange` sur diff d'état.
+- [ ] Reconnexion intelligente avec backoff, détection de reprise après `hold`.
 
 ## À faire ⛔
 
-- [ ] **Phase 6 — monitoring** : polling périodique de statut + émission `statusChange`,
-      reconnexion intelligente avec backoff, détection de reprise après `hold`.
 - [ ] **Projet d'exemple Capacitor exécutable** (Ionic) : écran scan → liste → test → défaut → impression.
 - [ ] **CI native** : activer les jobs Gradle (`./gradlew test`) et Xcode (`xcodebuild test`).
 - [ ] **Tests d'intégration matériels** par famille d'imprimante (matrice device).

@@ -19,6 +19,13 @@ final class ThermalPrinterEngine {
     /// Émetteur d'états de job (branché par le plugin sur notifyListeners).
     var onJobUpdate: ((JobUpdate) -> Void)?
 
+    /// Émetteur de changement de statut (branché par le plugin sur 'statusChange').
+    var onStatusChange: ((PrinterStatus) -> Void)?
+
+    /// Registre des moniteurs de statut actifs (Phase 6).
+    private var monitors: [String: Task<Void, Never>] = [:]
+    private let monitorLock = NSLock()
+
     private func emitJob(_ jobId: String, _ printerId: String, _ state: String,
                          holdReason: String? = nil, progress: Double? = nil,
                          errorCode: ErrorCode? = nil, message: String? = nil) {
@@ -210,6 +217,50 @@ final class ThermalPrinterEngine {
             throw PrinterError(.UNSUPPORTED_PRINTER, "Adapter introuvable")
         }
         return try await adapter.getStatus(profile)
+    }
+
+    // MARK: Monitoring de statut (Phase 6)
+
+    /// Démarre un polling périodique du statut et émet `statusChange` uniquement
+    /// quand l'état pertinent change (connexion/online/papier/capot). Idempotent.
+    func startStatusMonitor(_ printerId: String, intervalMs: Int) {
+        stopStatusMonitor(printerId)
+        let interval = min(max(intervalMs, 1000), 300_000)
+        let task = Task { [weak self] in
+            var lastKey: String?
+            while !Task.isCancelled {
+                guard let self = self else { return }
+                let status: PrinterStatus
+                do {
+                    status = try await self.getStatus(printerId)
+                } catch let e as PrinterError {
+                    status = PrinterStatus(id: printerId, connection: "error", online: false, paper: "unknown", errorCode: e.code, rawStatus: e.message)
+                } catch {
+                    status = PrinterStatus(id: printerId, connection: "error", online: false, paper: "unknown", rawStatus: "\(error)")
+                }
+                let key = "\(status.connection)|\(status.online)|\(status.paper)|\(String(describing: status.coverOpen))|\(String(describing: status.errorCode))"
+                if key != lastKey {
+                    lastKey = key
+                    self.onStatusChange?(status)
+                    Logger.shared.log("status", "change", ["id": printerId, "paper": status.paper])
+                }
+                try? await Task.sleep(nanoseconds: UInt64(interval) * 1_000_000)
+            }
+        }
+        monitorLock.lock(); monitors[printerId] = task; monitorLock.unlock()
+        Logger.shared.log("status", "monitor-start", ["id": printerId, "intervalMs": interval])
+    }
+
+    /// Arrête le moniteur d'une imprimante (no-op si absent).
+    func stopStatusMonitor(_ printerId: String) {
+        monitorLock.lock(); let t = monitors.removeValue(forKey: printerId); monitorLock.unlock()
+        t?.cancel()
+    }
+
+    /// Arrête tous les moniteurs.
+    func stopAllMonitors() {
+        monitorLock.lock(); let all = monitors; monitors.removeAll(); monitorLock.unlock()
+        all.values.forEach { $0.cancel() }
     }
 
     func debugLog() -> [[String: Any]] { Logger.shared.snapshot() }

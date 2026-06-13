@@ -36,6 +36,10 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         engine.onJobUpdate = { [weak self] update in
             self?.notifyListeners("printJobStatus", data: ["job": update.toDict()])
         }
+        // Relaye les changements de statut vers le JS (event statusChange).
+        engine.onStatusChange = { [weak self] status in
+            self?.notifyListeners("statusChange", data: ["status": status.toDict()])
+        }
     }
 
     // MARK: Permissions
@@ -205,10 +209,23 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         } }
     }
 
-    // MARK: Monitoring (Phase 6 — stubs)
+    // MARK: Monitoring (Phase 6)
 
-    @objc func startStatusMonitor(_ call: CAPPluginCall) { call.resolve() }
-    @objc func stopStatusMonitor(_ call: CAPPluginCall) { call.resolve() }
+    @objc func startStatusMonitor(_ call: CAPPluginCall) {
+        guard let printerId = call.getString("printerId") else {
+            return reject(call, .PRINTER_NOT_FOUND, "printerId requis")
+        }
+        engine.startStatusMonitor(printerId, intervalMs: call.getInt("intervalMs") ?? 5000)
+        call.resolve()
+    }
+
+    @objc func stopStatusMonitor(_ call: CAPPluginCall) {
+        guard let printerId = call.getString("printerId") else {
+            return reject(call, .PRINTER_NOT_FOUND, "printerId requis")
+        }
+        engine.stopStatusMonitor(printerId)
+        call.resolve()
+    }
 
     @objc func getDebugLog(_ call: CAPPluginCall) {
         call.resolve(["log": engine.debugLog()])
