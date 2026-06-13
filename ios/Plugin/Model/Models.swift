@@ -161,6 +161,8 @@ struct PrinterStatus {
 
 struct RenderOptions {
     var widthDots: Int
+    var resize: Bool = true
+    var grayscale: Bool = true
     var threshold: Int = 128
     var dithering: String = "floyd_steinberg"
     var align: String = "center"

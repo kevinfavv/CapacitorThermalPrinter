@@ -10,6 +10,7 @@ import type {
   ConnectOptions,
   DiscoverOptions,
   PrintImageOptions,
+  PrintTextOptions,
 } from './core/options';
 import type {
   DiscoveredPrinter,
@@ -69,6 +70,10 @@ export class ThermalPrinterWeb extends WebPlugin implements ThermalPrinterPlugin
 
   async printImage(_options: PrintImageOptions): Promise<PrintResult> {
     throw this.unsupported('printImage');
+  }
+
+  async printText(_options: PrintTextOptions): Promise<PrintResult> {
+    throw this.unsupported('printText');
   }
 
   async getPrinterStatus(_options: { printerId?: string }): Promise<PrinterStatus> {

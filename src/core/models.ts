@@ -1,5 +1,7 @@
 import type {
   ConnectionState,
+  HoldReason,
+  JobState,
   PaperStatus,
   PrinterAdapterId,
   PrinterTransport,
@@ -107,12 +109,33 @@ export interface PrinterStatus {
 }
 
 /**
- * Résultat normalisé d'une impression.
+ * Statut temps réel d'un job d'impression, émis via l'event `printJobStatus`.
+ */
+export interface PrintJobStatus {
+  /** Identifiant unique du job (retourné aussi dans PrintResult). */
+  jobId: string;
+  printerId: string;
+  state: JobState;
+  /** Raison si l'état est `hold`. */
+  holdReason?: HoldReason;
+  /** Progression 0..1 (best-effort : avancement de l'envoi des octets). */
+  progress?: number;
+  errorCode?: PrintErrorCode;
+  message?: string;
+  updatedAt: number;
+}
+
+/**
+ * Résultat normalisé d'une impression (image ou texte).
  */
 export interface PrintResult {
   success: boolean;
   printerId: string;
   adapter: PrinterAdapterId;
+  /** Identifiant du job (corrélé aux events printJobStatus). */
+  jobId: string;
+  /** État final du job (`completed` si succès). */
+  state: JobState;
   /** Nombre d'octets effectivement envoyés au transport. */
   bytesSent?: number;
   /** Durée totale (ms) de l'opération print (reconnexion incluse). */

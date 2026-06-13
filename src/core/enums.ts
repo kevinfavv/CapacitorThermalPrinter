@@ -55,3 +55,19 @@ export type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'err
  * Niveau de papier rapporté par le statut imprimante (si supporté).
  */
 export type PaperStatus = 'ok' | 'near_end' | 'empty' | 'unknown';
+
+/**
+ * État d'un job d'impression, suivi en temps réel via l'event `printJobStatus`.
+ *
+ * - `pending`   : job accepté, en file (connexion/rendu en cours).
+ * - `printing`  : octets/commandes en cours d'envoi ou d'impression physique.
+ * - `hold`      : impression suspendue par l'imprimante (attente papier, capot
+ *                 ouvert, tampon plein). Le job reprend dès résolution.
+ * - `completed` : impression physique terminée (best-effort selon transport/SDK).
+ * - `failed`    : échec définitif (voir errorCode).
+ * - `canceled`  : annulé par l'app.
+ */
+export type JobState = 'pending' | 'printing' | 'hold' | 'completed' | 'failed' | 'canceled';
+
+/** Raison d'un état `hold`. */
+export type HoldReason = 'paper_empty' | 'paper_near_end' | 'cover_open' | 'buffer_full' | 'offline' | 'unknown';

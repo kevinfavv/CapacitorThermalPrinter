@@ -156,23 +156,41 @@ Appeler `requestPermissions()` avant le premier scan.
 import { ThermalPrinter } from '@resto/capacitor-thermal-printer';
 
 ThermalPrinter.discoverPrinters(options?)   // → { printers: DiscoveredPrinter[] }
-ThermalPrinter.connectPrinter({ printerId, timeoutMs?, forceAdapter? })  // → { connected }
+ThermalPrinter.connectPrinter({ printerId, timeoutMs?, forceAdapter?, setAsDefault? })  // → { connected }
 ThermalPrinter.disconnectPrinter({ printerId })                          // → void
 ThermalPrinter.setDefaultPrinter({ printerId })                          // → { profile }
 ThermalPrinter.getDefaultPrinter()                                       // → { profile | null }
 ThermalPrinter.getSavedPrinters()                                        // → { profiles }
 ThermalPrinter.removePrinter({ printerId })                              // → void
-ThermalPrinter.printImage(options)                                       // → PrintResult
+ThermalPrinter.printImage(options)                                       // → PrintResult (await = imprimé)
+ThermalPrinter.printText({ items, ... })                                 // → PrintResult (await = imprimé)
 ThermalPrinter.getPrinterStatus({ printerId? })                          // → PrinterStatus
 ThermalPrinter.requestPermissions() / checkPermissions()                 // → PermissionStatus
 ThermalPrinter.startStatusMonitor({ printerId, intervalMs? })            // Phase 6
 ThermalPrinter.stopStatusMonitor({ printerId })                          // Phase 6
+ThermalPrinter.getDebugLog()                                             // → { log: DebugLogEntry[] }
 
 // Events
-ThermalPrinter.addListener('printerFound', e => ...)        // résultats incrémentaux
+ThermalPrinter.addListener('printerFound', e => ...)        // résultats de scan incrémentaux
 ThermalPrinter.addListener('discoveryComplete', e => ...)
-ThermalPrinter.addListener('statusChange', e => ...)        // Phase 6
+ThermalPrinter.addListener('statusChange', e => ...)        // PrinterStatus (papier/capot/connexion)
+ThermalPrinter.addListener('printJobStatus', e => ...)      // JobState: pending/printing/hold/completed/failed
 ```
+
+> **`connectPrinter({ setAsDefault: true })`** définit l'imprimante par défaut
+> **uniquement si la connexion réussit** (`connect` + `setDefaultPrinter` en une étape,
+> sans persister une imprimante injoignable).
+
+### Fin d'impression / `await`
+
+`printImage` et `printText` sont **asynchrones et se résolvent quand l'impression
+physique est terminée** (best-effort) — on peut donc `await`. Précisions :
+
+- **SDK fabricants** : la promesse attend le **callback de fin** du SDK (fiabilité max).
+- **ESC/POS TCP/SPP** : canal **unidirectionnel** → la promesse se résout quand tous
+  les octets sont **écrits et flushés**. Un **pré-contrôle de statut** est fait avant
+  l'envoi : papier vide / capot ouvert → job en `hold` + rejet `PAPER_EMPTY` /
+  `COVER_OPEN` (`retryable: true`).
 
 ## Types
 
@@ -206,9 +224,143 @@ interface DiscoveredPrinter {
   isConnected: boolean;
 }
 
-interface PrinterProfile { /* tout le nécessaire à la reconnexion, voir models.ts */ }
-interface PrinterStatus { connection; online; paper; coverOpen?; errorCode?; … }
-interface PrintResult { success; printerId; adapter; bytesSent?; durationMs?; status? }
+interface PrinterProfile {
+  id: string;
+  adapter: PrinterAdapterId;
+  transport: PrinterTransport;
+  address: string;
+  brand?: string; model?: string;
+  name: string;
+  capabilities: PrinterCapabilities;
+  defaultPrintOptions?: PrintRenderOptions;
+  adapterMeta?: Record<string, string | number | boolean>;
+  isDefault: boolean;
+  createdAt: number; updatedAt: number;
+}
+
+// ---- États / statuts ----
+type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
+type PaperStatus = 'ok' | 'near_end' | 'empty' | 'unknown';
+type JobState = 'pending' | 'printing' | 'hold' | 'completed' | 'failed' | 'canceled';
+type HoldReason = 'paper_empty' | 'paper_near_end' | 'cover_open' | 'buffer_full' | 'offline' | 'unknown';
+
+interface PrinterStatus {
+  id: string;
+  connection: ConnectionState;
+  online: boolean;
+  paper: PaperStatus;
+  coverOpen?: boolean;
+  errorCode?: PrintErrorCode;
+  rawStatus?: string;
+  checkedAt: number;
+}
+
+interface PrintJobStatus {
+  jobId: string;
+  printerId: string;
+  state: JobState;
+  holdReason?: HoldReason;
+  progress?: number;        // 0..1 (best-effort)
+  errorCode?: PrintErrorCode;
+  message?: string;
+  updatedAt: number;
+}
+
+interface PrintResult {
+  success: boolean;
+  printerId: string;
+  adapter: PrinterAdapterId;
+  jobId: string;            // corrélé aux events printJobStatus
+  state: JobState;          // 'completed' si succès
+  bytesSent?: number;
+  durationMs?: number;
+  status?: PrinterStatus;
+}
+
+// ---- Options d'impression image ----
+type DitheringAlgorithm = 'none' | 'floyd_steinberg' | 'atkinson';
+type ImageAlign = 'left' | 'center' | 'right';
+
+interface ImageSource { filePath?: string; url?: string; base64?: string; } // 1 seule clé
+
+interface PrintRenderOptions {
+  widthDots?: number;       // sinon déduit du profil (384/576/832)
+  resize?: boolean;         // défaut true ; false = image déjà à la bonne largeur
+  grayscale?: boolean;      // défaut true ; false = image déjà 1-bit (seuil simple)
+  threshold?: number;       // défaut 128 (si dithering 'none' ou grayscale false)
+  dithering?: DitheringAlgorithm; // défaut 'floyd_steinberg'
+  align?: ImageAlign;       // défaut 'center'
+  invert?: boolean;
+  cut?: boolean;            // défaut true
+  feedLines?: number;       // défaut 3
+  openCashDrawer?: boolean;
+  copies?: number;          // défaut 1
+}
+
+interface PrintImageOptions {
+  printerId?: string;       // sinon imprimante par défaut
+  image: ImageSource;
+  render?: PrintRenderOptions;
+  timeoutMs?: number;       // défaut 15000
+  autoReconnect?: boolean;  // défaut true
+}
+
+// ---- Events ----
+interface PrinterFoundEvent { printer: DiscoveredPrinter; }
+interface DiscoveryCompleteEvent { printers: DiscoveredPrinter[]; failedSources?: string[]; }
+interface StatusChangeEvent { status: PrinterStatus; }
+interface PrintJobStatusEvent { job: PrintJobStatus; }
+```
+
+### Types `printText`
+
+```ts
+type TextAlign = 'left' | 'center' | 'right';
+type Underline = 'none' | 'single' | 'double';
+type EscPosFont = 'A' | 'B';
+type CodePage = 'CP437' | 'CP850' | 'CP858' | 'WPC1252' | 'CP852' | 'CP866'; // FR: WPC1252
+type BarcodeSymbology = 'UPC_A'|'UPC_E'|'EAN13'|'EAN8'|'CODE39'|'ITF'|'CODABAR'|'CODE93'|'CODE128';
+type HriPosition = 'none' | 'above' | 'below' | 'both';
+type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
+
+interface TextStyle {
+  align?: TextAlign;
+  bold?: boolean;
+  underline?: Underline;
+  font?: EscPosFont;
+  widthMultiplier?: number;   // 1..8
+  heightMultiplier?: number;  // 1..8
+  doubleStrike?: boolean;
+  invert?: boolean;           // blanc sur noir
+  upsideDown?: boolean;
+  rotate90?: boolean;
+  letterSpacing?: number;     // dots
+  lineSpacing?: number;       // dots (sinon défaut)
+  codePage?: CodePage;
+  codePageId?: number;        // override brut ESC t n
+  newline?: boolean;          // défaut true
+}
+
+type PrintItem =
+  | { type: 'text'; value: string; style?: TextStyle }
+  | { type: 'feed'; lines?: number }
+  | { type: 'cut'; mode?: 'full' | 'partial'; feedBefore?: number }
+  | { type: 'divider'; char?: string; columns?: number; style?: Pick<TextStyle,'align'|'bold'|'font'> }
+  | { type: 'qrcode'; value: string; size?: number; errorCorrection?: QrErrorCorrection; align?: TextAlign }
+  | { type: 'barcode'; value: string; symbology: BarcodeSymbology; height?: number; width?: number; hri?: HriPosition; align?: TextAlign }
+  | { type: 'cashDrawer'; pin?: 2 | 5 }
+  | { type: 'image'; image: ImageSource; render?: PrintRenderOptions }
+  | { type: 'raw'; bytesBase64: string };
+
+interface PrintTextOptions {
+  printerId?: string;
+  items: PrintItem[];
+  defaultCodePage?: CodePage; // FR: 'WPC1252'
+  cut?: boolean;              // défaut false
+  feedLines?: number;         // défaut 3
+  timeoutMs?: number;
+  autoReconnect?: boolean;
+}
 ```
 
 ## Flux d'impression d'image
@@ -237,7 +389,126 @@ await ThermalPrinter.printImage({
 });
 ```
 
-## Conversion image → 1-bit & largeurs
+### Exemples concrets d'impression d'image
+
+```ts
+// 1) Fichier local (RECOMMANDÉ en production) — le plus fiable/performant
+await ThermalPrinter.printImage({ image: { filePath: '/data/user/0/app/files/ticket.png' } });
+
+// 2) URL distante — téléchargée et mise en cache par le plugin
+await ThermalPrinter.printImage({
+  image: { url: 'https://api.resto.app/tickets/123/render.png' },
+  render: { dithering: 'atkinson', cut: true },
+});
+
+// 3) base64 (pratique pour les tests, moins performant)
+await ThermalPrinter.printImage({ image: { base64: 'iVBORw0KGgoAAAANS...' } });
+
+// 4) Image DÉJÀ rendue serveur à la bonne largeur et en 1-bit noir/blanc :
+//    on désactive resize + grayscale → envoi pixel-perfect, plus rapide.
+await ThermalPrinter.printImage({
+  image: { filePath: '/data/.../ticket_576px_1bit.png' },
+  render: { resize: false, grayscale: false, cut: true },
+});
+
+// 5) Cibler une imprimante précise + 2 copies + tiroir-caisse
+await ThermalPrinter.printImage({
+  printerId: 'wifi:192.168.1.50',
+  image: { filePath: '/data/.../ticket.png' },
+  render: { widthDots: 576, copies: 2, openCashDrawer: true },
+});
+
+// 6) await = imprimé (best-effort) ; gestion d'erreur typée
+try {
+  const res = await ThermalPrinter.printImage({ image: { filePath } });
+  console.log('Imprimé', res.jobId, res.bytesSent, 'octets en', res.durationMs, 'ms');
+} catch (e) {
+  if ((e as PrinterError).code === PrintErrorCode.PAPER_EMPTY) alert('Plus de papier');
+}
+```
+
+> **`resize`/`grayscale` optionnels** : si votre serveur génère déjà un PNG à la
+> largeur exacte (`576px`/`384px`) et en noir/blanc 1-bit, passez
+> `render: { resize: false, grayscale: false }`. Le plugin applique alors un simple
+> seuil (pas de dithering) et n'altère pas la géométrie.
+
+## Impression de texte (`printText`)
+
+`printText` accepte un **tableau ordonné d'items typés**. Idéal pour les tickets
+purement textuels, sans pré-rendu serveur.
+
+```ts
+await ThermalPrinter.printText({
+  defaultCodePage: 'WPC1252', // accents FR
+  items: [
+    { type: 'text', value: 'LE RESTO', style: { align: 'center', bold: true, widthMultiplier: 2, heightMultiplier: 2 } },
+    { type: 'text', value: '12 rue des Lilas — Paris', style: { align: 'center' } },
+    { type: 'divider', char: '-' },
+    { type: 'text', value: 'Table 7', style: { bold: true } },
+    { type: 'text', value: 'Burger............12.00 €' },
+    { type: 'text', value: 'Café.............. 2.00 €' },
+    { type: 'divider' },
+    { type: 'text', value: 'TOTAL  14.00 €', style: { align: 'right', bold: true, widthMultiplier: 2 } },
+    { type: 'feed', lines: 1 },
+    { type: 'qrcode', value: 'https://resto.app/avis/123', size: 6, align: 'center' },
+    { type: 'barcode', value: '4006381333931', symbology: 'EAN13', hri: 'below' },
+    { type: 'cut', mode: 'partial', feedBefore: 3 },
+  ],
+});
+```
+
+### Styles supportés (ESC/POS) et correspondance SDK
+
+| Style / item | ESC/POS (escpos, rawTcp) | Epson ePOS2 | Star StarXpand | Brother | Zebra (ZPL) |
+|---|:--:|:--:|:--:|:--:|:--:|
+| `align` (left/center/right) | ✅ `ESC a` | ✅ | ✅ | ✅ | ✅ (champ) |
+| `bold` | ✅ `ESC E` | ✅ | ✅ | ✅ | ⚠️ via police |
+| `underline` (single/double) | ✅ `ESC -` | ✅ | ✅ | ⚠️ | ❌ |
+| `font` A/B | ✅ `ESC M` | ✅ | ✅ | ⚠️ | ⚠️ |
+| `widthMultiplier`/`heightMultiplier` (1..8) | ✅ `GS !` | ✅ | ✅ | ✅ | ✅ (taille) |
+| `doubleStrike` | ✅ `ESC G` | ✅ | ⚠️ | ❌ | ❌ |
+| `invert` (blanc/noir) | ✅ `GS B` | ✅ | ✅ | ⚠️ | ✅ (reverse) |
+| `upsideDown` | ✅ `ESC {` | ✅ | ⚠️ | ❌ | ✅ |
+| `rotate90` | ✅ `ESC V` | ✅ | ⚠️ | ⚠️ | ✅ |
+| `letterSpacing` | ✅ `ESC SP` | ✅ | ⚠️ | ❌ | ⚠️ |
+| `lineSpacing` | ✅ `ESC 3` | ✅ | ✅ | ⚠️ | ✅ |
+| `codePage` (accents) | ✅ `ESC t` | ✅ | ✅ | ✅ | ✅ |
+| `qrcode` | ✅ `GS ( k` | ✅ natif | ✅ natif | ✅ natif | ✅ `^BQ` |
+| `barcode` (EAN/CODE128…) | ✅ `GS k` | ✅ natif | ✅ natif | ✅ natif | ✅ `^BC`… |
+| `divider` / `feed` / `cut` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `cashDrawer` | ✅ `ESC p` | ✅ | ✅ | ⚠️ | ⚠️ |
+| `image` (intercalée) | ✅ raster | ✅ addImage | ✅ actionPrintImage | ✅ printImage | ✅ ^GF |
+| `raw` (octets bruts) | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ (ZPL brut) |
+
+> ✅ supporté · ⚠️ partiel/équivalent selon modèle · ❌ non disponible.
+> Les styles non supportés par un SDK sont **ignorés proprement** (jamais d'échec dur).
+> L'encodeur ESC/POS de référence est dans `src/core/escpos-text.ts` (testé), mirroré
+> en Kotlin (`EscPosTextEncoder.kt`) et Swift (`EscPosTextEncoder.swift`).
+
+## Événements & statut côté client
+
+```ts
+// Suivi des jobs : pending → printing → completed | hold | failed
+const jobSub = await ThermalPrinter.addListener('printJobStatus', ({ job }) => {
+  switch (job.state) {
+    case 'printing': showSpinner(job.progress); break;
+    case 'hold':     toast(job.holdReason === 'paper_empty' ? 'Ajoutez du papier' : 'Capot ouvert'); break;
+    case 'completed': hideSpinner(); break;
+    case 'failed':   alert(`Échec: ${job.errorCode}`); break;
+  }
+});
+
+// Statut imprimante (connexion, papier, capot)
+const statusSub = await ThermalPrinter.addListener('statusChange', ({ status }) => {
+  updateBadge(status.online, status.paper); // 'ok' | 'near_end' | 'empty' | 'unknown'
+});
+
+// ... plus tard
+await jobSub.remove();
+await statusSub.remove();
+```
+
+
 
 - **Largeurs de référence @203 dpi** : `58mm → 384 px`, `80mm → 576 px`, `112mm → 832 px`. Certains 80mm impriment `640 px` : on **privilégie toujours `printableDots` du profil/SDK** quand connu.
 - **Pipeline** : redimensionnement proportionnel à la largeur cible → niveaux de gris → binarisation.
@@ -311,6 +582,24 @@ catch (e) {
 
 Les adapters Epson/Star/Brother/Zebra sont **prêts à brancher** : `isAvailable()` détecte le SDK (réflexion `Class.forName` / `NSClassFromString`). Tant qu'un SDK est absent, son adapter est ignoré et le plugin **retombe sur ESC/POS** si l'imprimante répond en TCP. Voir [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
 
+## Tests & qualité
+
+- **TypeScript (Vitest)** : la logique métier pure (imaging, encodeur ESC/POS texte,
+  priorité d'adapter, dédoublonnage, erreurs, fallback web) est couverte par **65 tests**
+  avec un **coverage > 90 %** (seuils CI : 85 % lignes/fonctions, 80 % branches).
+
+  ```bash
+  npm test            # exécute la suite Vitest
+  npm run test:coverage
+  ```
+
+- **Android (JUnit)** : `android/src/test/...` valide les encodeurs ESC/POS texte et raster
+  (mêmes assertions octet-à-octet que les tests TS) → `./gradlew test`.
+- **iOS (XCTest)** : `ios/Tests/...` valide l'encodeur (mêmes vecteurs) → `xcodebuild test`.
+- **Tests d'intégration SDK** : à exécuter sur matériel réel quand les SDK sont liés
+  (voir ROADMAP). Les trois implémentations d'encodeur (TS/Kotlin/Swift) partagent les
+  **mêmes vecteurs de test**, garantissant un flux d'octets identique multiplateforme.
+
 ## Plan d'implémentation par phases
 
 | Phase | Contenu | État du squelette |
@@ -320,7 +609,10 @@ Les adapters Epson/Star/Brother/Zebra sont **prêts à brancher** : `isAvailable
 | **3** | **SDK Epson + Star** | 🔌 adapters stubs + pseudo-code |
 | **4** | **iOS** : Wi-Fi TCP + SDK Star/Epson | ✅ TCP / 🔌 SDK stubs |
 | **5** | **Brother + Zebra** | 🔌 adapters stubs + pseudo-code |
-| **6** | Statut avancé, monitoring, reconnexion intelligente, logs/diagnostics | ✅ logs / 🔌 monitor stubs |
+| **6** | Statut avancé, monitoring, reconnexion intelligente, logs/diagnostics | ✅ logs + events / 🔌 monitor stubs |
+| **+** | **`printText` stylé** (ESC/POS texte/QR/code-barres) + **events de job** | ✅ ESC/POS / 🔌 SDK builders |
+
+Voir [`ROADMAP.md`](ROADMAP.md) pour le détail de ce qu'il reste à faire.
 
 ## Exemple complet
 
@@ -333,18 +625,23 @@ const sub = await ThermalPrinter.addListener('printerFound', e => {
 });
 await ThermalPrinter.requestPermissions();
 const { printers } = await ThermalPrinter.discoverPrinters({ timeoutMs: 8000 });
-sub.remove();
+await sub.remove();
 
-// 2) Connexion + test
+// 2) Connexion qui définit le défaut SI elle réussit, puis test
 const target = printers[0];
-await ThermalPrinter.connectPrinter({ printerId: target.id });
+await ThermalPrinter.connectPrinter({ printerId: target.id, setAsDefault: true });
 await ThermalPrinter.printImage({ printerId: target.id, image: { base64: testTicketBase64 } });
 
-// 3) Enregistrer comme défaut (après test réussi)
-await ThermalPrinter.setDefaultPrinter({ printerId: target.id });
-
-// 4) Plus tard : impression simple (reconnexion auto)
+// 3) Plus tard : impression simple (imprimante par défaut + reconnexion auto)
 await ThermalPrinter.printImage({ image: { filePath: '/data/.../ticket.png' } });
+
+// 4) Ou impression texte stylée
+await ThermalPrinter.printText({
+  items: [
+    { type: 'text', value: 'Merci !', style: { align: 'center', bold: true } },
+    { type: 'cut' },
+  ],
+});
 ```
 
 ---

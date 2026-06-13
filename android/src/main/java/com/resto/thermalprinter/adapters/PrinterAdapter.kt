@@ -61,6 +61,27 @@ interface PrinterAdapter {
      */
     suspend fun printBitmap(profile: PrinterProfile, bitmap: Bitmap, options: RenderOptions): Int
 
+    /**
+     * Imprime une liste d'items texte stylés (+ QR/code-barres/feed/cut...).
+     * Pour ESC/POS : encodage via EscPosTextEncoder. Pour les SDK fabricants :
+     * mapping vers le builder du SDK (voir docs/SDK_INTEGRATION.md).
+     *
+     * Implémentation par défaut : non supportée (les adapters SDK la surchargent
+     * avec leur builder texte ; ESC/POS et rawTcp l'implémentent via l'encodeur).
+     *
+     * @return nombre d'octets envoyés (best effort).
+     */
+    suspend fun printItems(
+        profile: PrinterProfile,
+        items: List<com.resto.thermalprinter.model.PrintItem>,
+        defaultCodePage: String,
+        cut: Boolean,
+        feedLines: Int,
+    ): Int = throw com.resto.thermalprinter.model.PrinterException(
+        com.resto.thermalprinter.model.ErrorCode.SDK_NOT_AVAILABLE,
+        "printText non implémenté pour cet adapter (${id.value}) — voir docs/SDK_INTEGRATION.md",
+    )
+
     /** Lit le statut. Renvoie supportsStatus=false via online/paper=unknown si non supporté. */
     suspend fun getStatus(profile: PrinterProfile): PrinterStatus
 }

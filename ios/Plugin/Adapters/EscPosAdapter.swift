@@ -62,6 +62,18 @@ final class EscPosAdapter: PrinterAdapter {
         return sent
     }
 
+    func printItems(_ profile: PrinterProfile, items: [PrintItem], defaultCodePage: String, cut: Bool, feedLines: Int) async throws -> Int {
+        lock.lock(); let t = connections[profile.id]; lock.unlock()
+        guard let transport = t else { throw PrinterError(.CONNECTION_FAILED, "ESC/POS non connecté: \(profile.id)") }
+        let columns = profile.capabilities.printableDots <= 420 ? 32 : 48
+        let encoded = EscPosTextEncoder.encode(items, defaultCodePage: defaultCodePage, columns: columns)
+        var job = encoded.bytes
+        if feedLines > 0 { job += EscPosCommands.feed(feedLines) }
+        if cut && profile.capabilities.supportsCut { job += EscPosCommands.CUT_PARTIAL }
+        try await transport.write(job)
+        return job.count
+    }
+
     func getStatus(_ profile: PrinterProfile) async throws -> PrinterStatus {
         let connected = isConnected(profile.id)
         return PrinterStatus(

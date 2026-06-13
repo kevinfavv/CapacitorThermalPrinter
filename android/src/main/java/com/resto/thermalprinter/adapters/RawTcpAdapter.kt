@@ -61,6 +61,26 @@ class RawTcpAdapter : PrinterAdapter {
         return job.size
     }
 
+    override suspend fun printItems(
+        profile: PrinterProfile,
+        items: List<com.resto.thermalprinter.model.PrintItem>,
+        defaultCodePage: String,
+        cut: Boolean,
+        feedLines: Int,
+    ): Int {
+        val t = connections[profile.id]
+            ?: throw PrinterException(ErrorCode.CONNECTION_FAILED, "rawTcp non connecté")
+        val columns = if (profile.capabilities.printableDots <= 420) 32 else 48
+        val encoded = EscPosTextEncoder.encode(items, defaultCodePage, columns)
+        val out = java.io.ByteArrayOutputStream()
+        out.write(encoded.bytes)
+        if (feedLines > 0) out.write(EscPosCommands.feed(feedLines))
+        if (cut) out.write(EscPosCommands.CUT_PARTIAL)
+        val job = out.toByteArray()
+        t.write(job)
+        return job.size
+    }
+
     override suspend fun getStatus(profile: PrinterProfile): PrinterStatus {
         val connected = isConnected(profile.id)
         return PrinterStatus(

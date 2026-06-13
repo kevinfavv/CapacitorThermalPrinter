@@ -6,7 +6,7 @@
     "noUnusedParameters": true,
     "experimentalDecorators": true,
     "declaration": true,
-    "lib": ["dom", "es2017"],
+    "lib": ["dom", "es2019"],
     "module": "esnext",
     "moduleResolution": "node",
     "noEmitOnError": true,

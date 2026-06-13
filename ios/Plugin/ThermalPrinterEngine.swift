@@ -16,6 +16,16 @@ final class ThermalPrinterEngine {
     private var lastDiscovered: [DiscoveredPrinter] = []
     private let lock = NSLock()
 
+    /// Émetteur d'états de job (branché par le plugin sur notifyListeners).
+    var onJobUpdate: ((JobUpdate) -> Void)?
+
+    private func emitJob(_ jobId: String, _ printerId: String, _ state: String,
+                         holdReason: String? = nil, progress: Double? = nil,
+                         errorCode: ErrorCode? = nil, message: String? = nil) {
+        onJobUpdate?(JobUpdate(jobId: jobId, printerId: printerId, state: state,
+                               holdReason: holdReason, progress: progress, errorCode: errorCode, message: message))
+    }
+
     // MARK: Découverte
 
     func discover(_ options: DiscoveryManager.Options, emitPartial: @escaping (DiscoveredPrinter) -> Void) async -> (printers: [DiscoveredPrinter], failed: [String]) {
@@ -34,7 +44,7 @@ final class ThermalPrinterEngine {
 
     // MARK: Connexion
 
-    func connect(_ printerId: String, timeoutMs: Int, forceAdapter: AdapterId?) async throws -> Bool {
+    func connect(_ printerId: String, timeoutMs: Int, forceAdapter: AdapterId?, setAsDefault: Bool = false) async throws -> Bool {
         let profile = try resolveProfile(printerId, forceAdapter: forceAdapter)
         guard let adapter = adapterFor(profile.adapter) else {
             throw PrinterError(.UNSUPPORTED_PRINTER, "Aucun adapter pour \(profile.adapter.rawValue)")
@@ -43,7 +53,14 @@ final class ThermalPrinterEngine {
             throw PrinterError(.SDK_NOT_AVAILABLE, "Adapter \(profile.adapter.rawValue) indisponible")
         }
         try await adapter.connect(profile, timeoutMs: timeoutMs)
-        return adapter.isConnected(printerId)
+        let connected = adapter.isConnected(printerId)
+        // setAsDefault UNIQUEMENT si la connexion a réussi.
+        if connected && setAsDefault {
+            store.upsert(profile)
+            store.setDefault(printerId)
+            Logger.shared.log("connect", "set-default-after-connect", ["id": printerId])
+        }
+        return connected
     }
 
     func disconnect(_ printerId: String) async {
@@ -73,9 +90,21 @@ final class ThermalPrinterEngine {
         let autoReconnect: Bool
     }
 
+    struct PrintTextRequest {
+        let printerId: String?
+        let items: [PrintItem]
+        let defaultCodePage: String
+        let cut: Bool
+        let feedLines: Int
+        let timeoutMs: Int
+        let autoReconnect: Bool
+    }
+
     struct PrintOutcome {
         let printerId: String
         let adapter: AdapterId
+        let jobId: String
+        let state: String
         let bytesSent: Int
         let durationMs: Int
         let status: PrinterStatus?
@@ -83,25 +112,74 @@ final class ThermalPrinterEngine {
 
     func printImage(_ req: PrintRequest) async throws -> PrintOutcome {
         let started = Date()
+        let jobId = UUID().uuidString
         let profile = try resolveTargetProfile(req.printerId)
+        emitJob(jobId, profile.id, "pending")
         guard let adapter = adapterFor(profile.adapter) else {
-            throw PrinterError(.UNSUPPORTED_PRINTER, "Adapter introuvable")
+            let e = PrinterError(.UNSUPPORTED_PRINTER, "Adapter introuvable")
+            emitJob(jobId, profile.id, "failed", errorCode: e.code, message: e.message); throw e
         }
+        do {
+            if !adapter.isConnected(profile.id) {
+                guard req.autoReconnect else { throw PrinterError(.CONNECTION_FAILED, "Imprimante non connectée") }
+                try await ensureConnected(profile, timeoutMs: req.timeoutMs)
+            }
+            try await preflightHold(adapter, profile, jobId)
 
-        if !adapter.isConnected(profile.id) {
-            guard req.autoReconnect else { throw PrinterError(.CONNECTION_FAILED, "Imprimante non connectée") }
-            try await ensureConnected(profile, timeoutMs: req.timeoutMs)
+            let image = try await loadImage(req)
+            let render = resolveRenderOptions(profile, req.render)
+            let resized = render.resize ? try ImageProcessor.resizeToWidth(image, targetWidth: render.widthDots) : image
+
+            emitJob(jobId, profile.id, "printing", progress: 0.1)
+            let bytes = try await adapter.printImage(profile, image: resized, options: render)
+            let status = try? await adapter.getStatus(profile)
+            let duration = Int(Date().timeIntervalSince(started) * 1000)
+            emitJob(jobId, profile.id, "completed", progress: 1.0)
+            return PrintOutcome(printerId: profile.id, adapter: profile.adapter, jobId: jobId, state: "completed", bytesSent: bytes, durationMs: duration, status: status)
+        } catch let e as PrinterError {
+            emitJob(jobId, profile.id, "failed", errorCode: e.code, message: e.message); throw e
         }
+    }
 
-        let image = try await loadImage(req)
-        let render = resolveRenderOptions(profile, req.render)
-        let resized = try ImageProcessor.resizeToWidth(image, targetWidth: render.widthDots)
+    func printText(_ req: PrintTextRequest) async throws -> PrintOutcome {
+        let started = Date()
+        let jobId = UUID().uuidString
+        let profile = try resolveTargetProfile(req.printerId)
+        emitJob(jobId, profile.id, "pending")
+        guard let adapter = adapterFor(profile.adapter) else {
+            let e = PrinterError(.UNSUPPORTED_PRINTER, "Adapter introuvable")
+            emitJob(jobId, profile.id, "failed", errorCode: e.code, message: e.message); throw e
+        }
+        do {
+            if !adapter.isConnected(profile.id) {
+                guard req.autoReconnect else { throw PrinterError(.CONNECTION_FAILED, "Imprimante non connectée") }
+                try await ensureConnected(profile, timeoutMs: req.timeoutMs)
+            }
+            try await preflightHold(adapter, profile, jobId)
 
-        let bytes = try await adapter.printImage(profile, image: resized, options: render)
-        let status = try? await adapter.getStatus(profile)
-        let duration = Int(Date().timeIntervalSince(started) * 1000)
-        Logger.shared.log("print", "done", ["id": profile.id, "bytes": bytes, "ms": duration])
-        return PrintOutcome(printerId: profile.id, adapter: profile.adapter, bytesSent: bytes, durationMs: duration, status: status)
+            emitJob(jobId, profile.id, "printing", progress: 0.1)
+            let bytes = try await adapter.printItems(profile, items: req.items, defaultCodePage: req.defaultCodePage, cut: req.cut, feedLines: req.feedLines)
+            let status = try? await adapter.getStatus(profile)
+            let duration = Int(Date().timeIntervalSince(started) * 1000)
+            emitJob(jobId, profile.id, "completed", progress: 1.0)
+            return PrintOutcome(printerId: profile.id, adapter: profile.adapter, jobId: jobId, state: "completed", bytesSent: bytes, durationMs: duration, status: status)
+        } catch let e as PrinterError {
+            emitJob(jobId, profile.id, "failed", errorCode: e.code, message: e.message); throw e
+        }
+    }
+
+    /// Lit le statut avant impression ; émet HOLD + lève si papier/capot bloquant.
+    private func preflightHold(_ adapter: PrinterAdapter, _ profile: PrinterProfile, _ jobId: String) async throws {
+        guard profile.capabilities.supportsStatus else { return }
+        guard let st = try? await adapter.getStatus(profile) else { return }
+        if st.paper == "empty" {
+            emitJob(jobId, profile.id, "hold", holdReason: "paper_empty")
+            throw PrinterError(.PAPER_EMPTY, "Plus de papier", retryable: true)
+        }
+        if st.coverOpen == true {
+            emitJob(jobId, profile.id, "hold", holdReason: "cover_open")
+            throw PrinterError(.COVER_OPEN, "Capot ouvert", retryable: true)
+        }
     }
 
     // MARK: Profils

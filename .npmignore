@@ -26,3 +26,9 @@ rollup.config.mjs
 # OS
 .DS_Store
 Thumbs.db
+
+# Tests
+/test/
+/vitest.config.ts
+/coverage/
+/scripts/

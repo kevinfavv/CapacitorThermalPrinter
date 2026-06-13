@@ -4,6 +4,26 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Ajouté
+- **`printText([...])`** : impression de texte stylé via un tableau d'items typés
+  (texte, divider, QR code, code-barres, feed, cut, tiroir, image, raw). Styles
+  ESC/POS complets (gras, souligné, taille, police, inversion, rotation, interligne,
+  page de code pour les accents) + tableau de correspondance SDK documenté.
+- **Événement `printJobStatus`** : suivi temps réel des jobs
+  (`pending`/`printing`/`hold`/`completed`/`failed`, avec `holdReason`).
+- **Options image `resize` et `grayscale`** : désactivables si l'image est déjà
+  rendue à la bonne largeur / en 1-bit côté serveur.
+- **`connectPrinter({ setAsDefault })`** : définit l'imprimante par défaut
+  uniquement si la connexion réussit.
+- **`printImage`/`printText` résolvent quand l'impression est terminée** (best-effort
+  selon transport/SDK) + `PrintResult` enrichi de `jobId` et `state`.
+- Encodeur ESC/POS texte de référence (TS) + miroirs Kotlin/Swift.
+- Suite de tests **Vitest** (65 tests, coverage > 90 %) + tests JUnit (Android) et
+  XCTest (iOS) des encodeurs ; seuils de couverture appliqués en CI.
+- `ROADMAP.md`.
+
 ## [0.1.0] - Non publié
 
 ### Ajouté

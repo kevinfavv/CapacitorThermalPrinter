@@ -84,6 +84,27 @@ class EscPosAdapter(
         return sent
     }
 
+    override suspend fun printItems(
+        profile: PrinterProfile,
+        items: List<com.resto.thermalprinter.model.PrintItem>,
+        defaultCodePage: String,
+        cut: Boolean,
+        feedLines: Int,
+    ): Int {
+        val transport = connections[profile.id]
+            ?: throw PrinterException(ErrorCode.CONNECTION_FAILED, "ESC/POS non connecté: ${profile.id}")
+        // Colonnes selon largeur (police A ~ 12 dots/char): 384->32, 576->48.
+        val columns = if (profile.capabilities.printableDots <= 420) 32 else 48
+        val encoded = EscPosTextEncoder.encode(items, defaultCodePage, columns)
+        val out = java.io.ByteArrayOutputStream()
+        out.write(encoded.bytes)
+        if (feedLines > 0) out.write(EscPosCommands.feed(feedLines))
+        if (cut && profile.capabilities.supportsCut) out.write(EscPosCommands.CUT_PARTIAL)
+        val job = out.toByteArray()
+        transport.write(job)
+        return job.size
+    }
+
     override suspend fun getStatus(profile: PrinterProfile): PrinterStatus {
         val transport = connections[profile.id]
         if (transport == null || !transport.isOpen) {
