@@ -22,7 +22,7 @@ apply plugin: 'kotlin-android'
 apply plugin: 'jacoco'
 
 android {
-    namespace "com.resto.thermalprinter"
+    namespace "com.delicity.thermalprinter"
     compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
     defaultConfig {
         minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 23

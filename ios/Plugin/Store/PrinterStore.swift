@@ -3,7 +3,7 @@ import Foundation
 /// Persistance des profils via UserDefaults (JSON). Miroir de PrinterStore.kt.
 final class PrinterStore {
 
-    private let key = "resto.thermalprinter.profiles_v1"
+    private let key = "delicity.thermalprinter.profiles_v1"
     private let defaults = UserDefaults.standard
     private let queue = DispatchQueue(label: "thermalprinter.store")
 

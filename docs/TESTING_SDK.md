@@ -26,7 +26,7 @@ test, et comme elle n'est que sur le classpath de test, `isAvailable()` reste
 Exemple fourni (Epson) :
 - Faux SDK : `android/src/test/java/com/epson/epos2/printer/FakeEposPrinter.kt`,
   `.../discovery/FakeEposDiscovery.kt` (mêmes packages/classes/signatures que le vrai).
-- Test : `android/src/test/java/com/resto/thermalprinter/adapters/EpsonAdapterTest.kt`
+- Test : `android/src/test/java/com/delicity/thermalprinter/adapters/EpsonAdapterTest.kt`
   (Robolectric) couvre `connect` / `printBitmap` / `printItems` / `getStatus` / `discover`
   / `disconnect` en vérifiant les appels reçus par le faux SDK.
 - Moteur réflexif : `SdkReflectTest.kt` (JVM pur, sans Robolectric).

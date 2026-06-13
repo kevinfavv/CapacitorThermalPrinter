@@ -79,7 +79,7 @@ capacitor-thermal-printer/
 │   └── adapters/
 │       ├── priority.ts                   # moteur de priorité d'adapter
 │       └── dedup.ts                       # id stable + fusion des doublons
-├── android/src/main/java/com/resto/thermalprinter/
+├── android/src/main/java/com/delicity/thermalprinter/
 │   ├── ThermalPrinterPlugin.kt           # bridge Capacitor
 │   ├── ThermalPrinterEngine.kt           # orchestration
 │   ├── Logger.kt
@@ -701,4 +701,4 @@ await ThermalPrinter.printText({
 
 ## Licence
 
-MIT © Resto
+MIT © Delicity

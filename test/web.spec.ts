@@ -4,7 +4,7 @@ import { ThermalPrinterWeb } from '../src/web';
 import { PrintErrorCode } from '../src/core/enums';
 import type { PrinterProfile } from '../src/core/models';
 
-const KEY = 'resto.thermalprinter.profiles';
+const KEY = 'delicity.thermalprinter.profiles';
 
 function seed(profiles: PrinterProfile[]): void {
   localStorage.setItem(KEY, JSON.stringify(profiles));
@@ -84,6 +84,14 @@ describe('ThermalPrinterWeb', () => {
 
   it('getDebugLog renvoie un journal vide', async () => {
     expect((await web.getDebugLog()).log).toEqual([]);
+  });
+
+  it('getActiveSdks liste les adapters (tous indisponibles sur le web)', async () => {
+    const { sdks } = await web.getActiveSdks();
+    expect(sdks.map(s => s.adapter)).toEqual(['escpos', 'star', 'epson', 'brother', 'zebra', 'rawTcp']);
+    expect(sdks.every(s => s.available === false)).toBe(true);
+    expect(sdks.find(s => s.adapter === 'star')?.requiresSdk).toBe(true);
+    expect(sdks.find(s => s.adapter === 'escpos')?.requiresSdk).toBe(false);
   });
 
   it('disconnect/monitor sont des no-op résolus', async () => {

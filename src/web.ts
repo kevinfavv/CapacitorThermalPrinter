@@ -30,7 +30,7 @@ import type {
  * Cela permet de développer toute l'UI Capacitor sans device.
  */
 export class ThermalPrinterWeb extends WebPlugin implements ThermalPrinterPlugin {
-  private readonly storageKey = 'resto.thermalprinter.profiles';
+  private readonly storageKey = 'delicity.thermalprinter.profiles';
 
   async discoverPrinters(_options?: DiscoverOptions): Promise<{ printers: DiscoveredPrinter[] }> {
     // Aucune découverte matérielle possible sur le web.

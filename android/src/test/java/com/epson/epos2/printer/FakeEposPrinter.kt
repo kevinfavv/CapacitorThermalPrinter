@@ -7,7 +7,7 @@ import android.graphics.Bitmap
  * FAUX SDK Epson ePOS2 — présent UNIQUEMENT sur le classpath de test.
  *
  * Reproduit le package/les classes/les signatures réellement appelés par
- * [com.resto.thermalprinter.adapters.EpsonAdapter] via réflexion. Comme l'adapter
+ * [com.delicity.thermalprinter.adapters.EpsonAdapter] via réflexion. Comme l'adapter
  * résout les classes par `Class.forName("com.epson.epos2.printer.Printer")`, ce faux
  * est exécuté à sa place en test → on couvre tout le plumbing réflexif (connexion,
  * impression image/texte, statut) SANS le binaire propriétaire ni imprimante.

@@ -8,7 +8,7 @@ final class Logger {
     private var ring: [[String: Any]] = []
     private let queue = DispatchQueue(label: "thermalprinter.logger")
     var verbose = false
-    private let osLog = OSLog(subsystem: "com.resto.thermalprinter", category: "plugin")
+    private let osLog = OSLog(subsystem: "com.delicity.thermalprinter", category: "plugin")
 
     func log(_ category: String, _ message: String, _ data: [String: Any]? = nil) {
         queue.sync {
