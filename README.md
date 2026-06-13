@@ -1,38 +1,38 @@
 # @delicity/capacitor-thermal-printer
 
-> Plugin Capacitor **7** d'impression thermique **multi-marques** (ESC/POS, Epson, Star, Brother, Zebra) **par image**, avec **découverte agrégée**, **dédoublonnage**, **reconnexion automatique** et **API JavaScript unique**.
+> Capacitor **7** plugin for **thermal / receipt / label printing** — **multi-brand** (ESC/POS, Epson, Star, Brother, Zebra), **image-based**, with **aggregated discovery**, **deduplication**, **automatic reconnection** and a **single JavaScript API**.
 
-Conçu pour la **restauration** : le commerçant clique sur « Ajouter une imprimante », choisit dans une liste, fait un test d'impression, puis n'a plus jamais à toucher aux réglages Bluetooth/Wi-Fi du téléphone.
+For **any Capacitor app that needs to print** — point of sale, receipts, order tickets, shipping/label printing, kitchen slips, etc. The user taps "Add a printer", picks one from a list, runs a test print, and never has to touch the phone's Bluetooth/Wi-Fi settings again.
 
 ---
 
-## Sommaire
+## Contents
 
-1. [Philosophie](#philosophie)
+1. [Philosophy](#philosophy)
 2. [Architecture](#architecture)
 3. [Installation](#installation)
-4. [SDK fabricants](#sdk-fabricants)
+4. [Manufacturer SDKs](#manufacturer-sdks)
 5. [Permissions](#permissions)
-6. [API publique](#api-publique)
+6. [Public API](#public-api)
 7. [Types](#types)
-8. [Flux d'impression d'image](#flux-dimpression-dimage)
-9. [Conversion image → 1-bit & largeurs](#conversion-image--1-bit--largeurs)
-10. [Découverte agrégée & priorité d'adapter](#découverte-agrégée--priorité-dadapter)
-11. [Imprimante par défaut & reconnexion](#imprimante-par-défaut--reconnexion)
-12. [Erreurs normalisées](#erreurs-normalisées)
-13. [Différences Android / iOS](#différences-android--ios)
-14. [Cache image & logs/diagnostic](#cache-image--logsdiagnostic)
-15. [Plan d'implémentation par phases](#plan-dimplémentation-par-phases)
-16. [Exemple complet](#exemple-complet)
+8. [Image printing flow](#image-printing-flow)
+9. [Image processing](#image-processing)
+10. [Aggregated discovery & adapter priority](#aggregated-discovery--adapter-priority)
+11. [Default printer & reconnection](#default-printer--reconnection)
+12. [Normalized errors](#normalized-errors)
+13. [Android / iOS differences](#android--ios-differences)
+14. [Image cache & logs/diagnostics](#image-cache--logsdiagnostics)
+15. [Implementation phases](#implementation-phases)
+16. [Full example](#full-example)
 
 ---
 
-## Philosophie
+## Philosophy
 
-- **L'app génère une image du ticket** (PNG/bitmap). Elle n'envoie jamais de texte structuré aux SDK.
-- Le plugin **reçoit une image**, la **normalise** (resize → niveaux de gris → 1-bit + dithering), la **convertit au format de l'adapter** et l'**envoie**.
-- **Une seule API JS.** En interne, une **architecture par adapters** route vers la bonne implémentation.
-- **Il n'existe pas de protocole universel** : chaque famille a son adapter. La priorité d'adapter garantit le meilleur choix.
+- **The app generates an image of what to print** (PNG/bitmap — receipt, ticket, label). It never sends structured text to the SDKs.
+- The plugin **receives an image**, **normalizes** it (resize → grayscale → 1-bit + dithering), **converts** it to the adapter's format, and **sends** it.
+- **One JS API.** Internally, an **adapter-based architecture** routes to the right implementation.
+- **There is no universal protocol**: each family has its adapter. Adapter priority guarantees the best choice.
 
 ## Architecture
 
@@ -41,7 +41,7 @@ Conçu pour la **restauration** : le commerçant clique sur « Ajouter une impri
 │                     App (Ionic/JS/TS)                          │
 │   discoverPrinters / connect / setDefault / printImage ...     │
 └───────────────────────────────┬───────────────────────────────┘
-                                 │  API unique (definitions.ts)
+                                 │  Single API (definitions.ts)
                  ┌───────────────┴───────────────┐
                  │      Capacitor Bridge          │
         ┌────────┴─────────┐           ┌──────────┴─────────┐
@@ -58,49 +58,50 @@ Conçu pour la **restauration** : le commerçant clique sur « Ajouter une impri
    │ EscPos · Epson · Star · Brother · Zebra · RawTcp · BLE │
    │ Transport: TCP9100 / SPP(Android) / NWConnection(iOS)  │
    │ Image: decode → resize → grayscale → dither → raster   │
-   │ Store: profils + imprimante par défaut (persistés)     │
+   │ Store: profiles + default printer (persisted)          │
    └────────────────────────────────────────────────────────┘
 ```
 
-### Structure des dossiers
+### Folder structure
 
 ```
 capacitor-thermal-printer/
-├── src/                                  # API TypeScript publique
+├── src/                                  # Public TypeScript API
 │   ├── index.ts                          # registerPlugin + exports
-│   ├── definitions.ts                    # contrat natif (interface plugin)
-│   ├── web.ts                            # fallback web (dev UI)
+│   ├── definitions.ts                    # native contract (plugin interface)
+│   ├── web.ts                            # web fallback (dev UI)
 │   ├── core/
-│   │   ├── enums.ts                      # transports, adapters, codes erreur
+│   │   ├── enums.ts                      # transports, adapters, error codes
 │   │   ├── models.ts                     # DiscoveredPrinter, PrinterProfile, Status…
-│   │   ├── options.ts                    # options discover/print/connect
-│   │   ├── errors.ts                     # PrinterError + normalisation
-│   │   └── imaging.ts                    # spec raster ESC/POS + dithering (réf. TS)
+│   │   ├── options.ts                    # discover/print/connect options
+│   │   ├── errors.ts                     # PrinterError + normalization
+│   │   └── imaging.ts                    # ESC/POS raster spec + dithering (TS ref.)
 │   └── adapters/
-│       ├── priority.ts                   # moteur de priorité d'adapter
-│       └── dedup.ts                       # id stable + fusion des doublons
+│       ├── priority.ts                   # adapter priority engine
+│       └── dedup.ts                       # stable id + duplicate merging
 ├── android/src/main/java/com/delicity/thermalprinter/
-│   ├── ThermalPrinterPlugin.kt           # bridge Capacitor
+│   ├── ThermalPrinterPlugin.kt           # Capacitor bridge
 │   ├── ThermalPrinterEngine.kt           # orchestration
 │   ├── Logger.kt
 │   ├── adapters/  (PrinterAdapter, EscPos, Epson, Star, Brother, Zebra, RawTcp, Ble, Usb)
-│   ├── transport/ (ByteTransport, TcpTransport, BluetoothSppTransport)
-│   ├── discovery/ (DiscoveryManager, TcpScanner, BluetoothClassicScanner, AdapterPriority)
-│   ├── image/     (ImageProcessor, ImageCache)
+│   ├── transport/ (ByteTransport, TcpTransport, BluetoothSppTransport, BleGattClient)
+│   ├── discovery/ (DiscoveryManager, TcpScanner, BluetoothClassicScanner, BleScanner, AdapterPriority)
+│   ├── image/     (ImageProcessor, ImageCache, TextRasterizer)
 │   ├── store/     (PrinterStore)
 │   └── model/     (Models.kt)
 ├── ios/Plugin/
-│   ├── ThermalPrinterPlugin.swift + .m   # bridge Capacitor
+│   ├── ThermalPrinterPlugin.swift + .m   # Capacitor bridge
 │   ├── ThermalPrinterEngine.swift
 │   ├── Logger.swift
 │   ├── Adapters/  (PrinterAdapter, EscPos, Epson, Star, Brother, Zebra, RawTcp)
 │   ├── Transport/ (TcpTransport — Network.framework)
 │   ├── Discovery/ (DiscoveryManager, BonjourScanner, AdapterPriority)
-│   ├── Image/     (ImageProcessor, ImageCache)
+│   ├── Image/     (ImageProcessor, ImageCache, TextRasterizer)
 │   ├── Store/     (PrinterStore)
 │   └── Model/     (Models.swift)
 └── docs/
-    └── SDK_INTEGRATION.md
+    ├── SDK_INTEGRATION.md
+    └── TESTING_SDK.md
 ```
 
 ## Installation
@@ -110,91 +111,90 @@ npm install @delicity/capacitor-thermal-printer
 npx cap sync
 ```
 
-**Prérequis Capacitor 7** : Android `compileSdk 35` / JDK 21 ; iOS 14+ / Xcode 16+.
+**Capacitor 7 requirements**: Android `compileSdk 35` / JDK 21 ; iOS 14+ / Xcode 16+.
 
-## SDK fabricants
+## Manufacturer SDKs
 
-Le plugin gère **Star, Epson, Brother, Zebra** via leur SDK natif, **en option** :
-il compile et fonctionne **sans aucun SDK** (ESC/POS générique sur TCP/Bluetooth/
-USB/BLE), et chaque marque s'**active automatiquement** dès que son binaire est
-présent.
+The plugin supports **Star, Epson, Brother, Zebra** via their native SDK, **optionally**:
+it compiles and works **without any SDK** (generic ESC/POS over TCP/Bluetooth/USB/BLE),
+and each brand **activates automatically** as soon as its binary is present.
 
-> **Pourquoi ce n'est pas 100 % automatique au `npm install` ?**
-> Seuls les SDK publiés sur un dépôt de paquets standard se téléchargent seuls.
-> Les autres ne sont distribués que via le portail du fabricant et leur **licence
-> interdit la redistribution** — on ne peut donc ni les mettre sur Maven Central /
-> CocoaPods, ni les committer ici. L'app consommatrice les télécharge elle-même
-> (elle accepte la licence) ; le plugin fournit tout le code pour s'en servir.
+> **Why isn't it 100% automatic on `npm install`?**
+> Only SDKs published to a standard package repository download by themselves.
+> The others are distributed only through the manufacturer's portal and their
+> **license forbids redistribution** — so they cannot be put on Maven Central /
+> CocoaPods, nor committed here. The consuming app downloads the binary itself
+> (accepting the license); the plugin provides all the code to use it.
 
-| Marque | Android | iOS | À faire dans l'app |
+| Brand | Android | iOS | What to do in the app |
 |---|---|---|---|
-| **Star** | ✅ auto (Maven Central) | ✅ auto (SPM) | Ajouter le package SPM `StarXpand-SDK-iOS` (iOS). Android : rien. |
-| **Brother** | ⛔ `.aar` manuel | ✅ auto (CocoaPods) | `pod 'BRLMPrinterKit'` (iOS) ; déposer `BrotherPrintLibrary.aar` (Android). |
-| **Epson** | ⛔ `.jar`+`.so` manuel | ⛔ xcframework manuel | Déposer `ePOS2.jar` (Android) / `libepos2.xcframework` (iOS). |
-| **Zebra** | ⚠️ Maven privé (token) ou `.jar` | ⛔ xcframework manuel | Token Zebra ou `ZSDK_ANDROID_API.jar` ; `ZSDK_API.xcframework` (iOS). |
+| **Star** | ✅ auto (Maven Central) | ✅ auto (SPM) | Add the `StarXpand-SDK-iOS` SPM package (iOS). Android: nothing. |
+| **Brother** | ⛔ manual `.aar` | ✅ auto (CocoaPods) | `pod 'BRLMPrinterKit'` (iOS); drop `BrotherPrintLibrary.aar` (Android). |
+| **Epson** | ⛔ manual `.jar`+`.so` | ⛔ manual xcframework | Drop `ePOS2.jar` (Android) / `libepos2.xcframework` (iOS). |
+| **Zebra** | ⚠️ private Maven (token) or `.jar` | ⛔ manual xcframework | Zebra token or `ZSDK_ANDROID_API.jar`; `ZSDK_API.xcframework` (iOS). |
 
-**Liens de téléchargement officiels :**
-- **Star** : [StarXpand-SDK-Android](https://github.com/star-micronics/StarXpand-SDK-Android) · [StarXpand-SDK-iOS](https://github.com/star-micronics/StarXpand-SDK-iOS) (rien à télécharger : Maven Central / SPM)
-- **Epson** : [Epson Developers](https://epson.com/developers-products) · [MFi / ePOS SDK](https://global.epson.com/products_and_drivers/tm/en/mfi.html)
-- **Brother** : [Mobile SDK (download)](https://support.brother.com/g/s/es/dev/en/mobilesdk/download/index.html) · US : [Brother Developer Program](https://developerprogram.brother-usa.com/sdk-download) · iOS pod : [BRLMPrinterKit](https://cocoapods.org/pods/BRLMPrinterKit)
-- **Zebra** : [Link-OS Multiplatform SDK](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk) · [Téléchargements & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)
+**Official download links:**
+- **Star**: [StarXpand-SDK-Android](https://github.com/star-micronics/StarXpand-SDK-Android) · [StarXpand-SDK-iOS](https://github.com/star-micronics/StarXpand-SDK-iOS) (nothing to download: Maven Central / SPM)
+- **Epson**: [Epson Developers](https://epson.com/developers-products) · [MFi / ePOS SDK](https://global.epson.com/products_and_drivers/tm/en/mfi.html)
+- **Brother**: [Mobile SDK (download)](https://support.brother.com/g/s/es/dev/en/mobilesdk/download/index.html) · US: [Brother Developer Program](https://developerprogram.brother-usa.com/sdk-download) · iOS pod: [BRLMPrinterKit](https://cocoapods.org/pods/BRLMPrinterKit)
+- **Zebra**: [Link-OS Multiplatform SDK](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk) · [Downloads & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)
 
-> Epson / Brother / Zebra : compte développeur gratuit + acceptation de licence requis.
+> Epson / Brother / Zebra: a free developer account + license acceptance are required.
 
-Procédure détaillée (où déposer chaque binaire, dépôt Maven privé Zebra, noms de
-modules iOS, dossier de test ignoré par git) : **[`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md)**.
+Step-by-step setup (where to drop each binary, Zebra private Maven repo, iOS module
+names, git-ignored test folder): **[`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md)**.
 
-### Savoir quels SDK sont actifs (runtime)
+### Know which SDKs are active (runtime)
 
-`getActiveSdks()` indique, à l'instant présent, quels adapters/SDK sont disponibles :
+`getActiveSdks()` reports, at the current moment, which adapters/SDKs are available:
 
 ```ts
 import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
 
 const { sdks } = await ThermalPrinter.getActiveSdks();
 // [
-//   { adapter: 'escpos', label: 'ESC/POS générique', available: true,  requiresSdk: false, transports: ['wifi','ethernet','bluetooth','usb'] },
-//   { adapter: 'star',   label: 'Star StarXpand',    available: true,  requiresSdk: true,  transports: ['wifi','bluetooth','ble','usb'] },
-//   { adapter: 'epson',  label: 'Epson ePOS2',       available: false, requiresSdk: true,  transports: ['wifi','bluetooth','usb'] },
+//   { adapter: 'escpos', label: 'Generic ESC/POS', available: true,  requiresSdk: false, transports: ['wifi','ethernet','bluetooth','usb'] },
+//   { adapter: 'star',   label: 'Star StarXpand',  available: true,  requiresSdk: true,  transports: ['wifi','bluetooth','ble','usb'] },
+//   { adapter: 'epson',  label: 'Epson ePOS2',     available: false, requiresSdk: true,  transports: ['wifi','bluetooth','usb'] },
 //   ...
 // ]
-const actifs = sdks.filter(s => s.available).map(s => s.label);
+const active = sdks.filter(s => s.available).map(s => s.label);
 ```
 
-Utile pour un écran « Diagnostic imprimante » ou pour n'afficher que les marques
-réellement disponibles sur l'appareil.
+Useful for a "Printer diagnostics" screen, or to only show the brands actually
+available on the device.
 
 ## Permissions
 
-### Android (`AndroidManifest.xml` du plugin, déjà fourni)
+### Android (plugin `AndroidManifest.xml`, already provided)
 
-| Permission | Usage | API |
+| Permission | Use | API |
 |---|---|---|
-| `BLUETOOTH_SCAN` (`neverForLocation`) | scan BT/BLE | 31+ |
-| `BLUETOOTH_CONNECT` | connexion SPP/GATT | 31+ |
-| `BLUETOOTH`, `BLUETOOTH_ADMIN` | scan/connexion | ≤30 |
-| `ACCESS_FINE_LOCATION` | scan BLE | ≤30 |
-| `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` | TCP 9100 + détection réseau | toutes |
-| `CHANGE_WIFI_MULTICAST_STATE` | mDNS | toutes |
-| `android.hardware.usb.host` (feature) | USB | optionnel |
+| `BLUETOOTH_SCAN` (`neverForLocation`) | BT/BLE scan | 31+ |
+| `BLUETOOTH_CONNECT` | SPP/GATT connection | 31+ |
+| `BLUETOOTH`, `BLUETOOTH_ADMIN` | scan/connection | ≤30 |
+| `ACCESS_FINE_LOCATION` | BLE scan | ≤30 |
+| `INTERNET`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE` | TCP 9100 + network detection | all |
+| `CHANGE_WIFI_MULTICAST_STATE` | mDNS | all |
+| `android.hardware.usb.host` (feature) | USB | optional |
 
-Appeler `requestPermissions()` avant le premier scan.
+Call `requestPermissions()` before the first scan.
 
-### iOS (`Info.plist` de l'app hôte)
+### iOS (host app `Info.plist`)
 
 ```xml
 <key>NSLocalNetworkUsageDescription</key>
-<string>Découverte et impression sur les imprimantes du réseau local.</string>
+<string>Discover and print to printers on the local network.</string>
 <key>NSBonjourServices</key>
 <array>
   <string>_pdl-datastream._tcp</string>
   <string>_printer._tcp</string>
   <string>_ipp._tcp</string>
 </array>
-<!-- Si BLE activé : -->
+<!-- If BLE is enabled: -->
 <key>NSBluetoothAlwaysUsageDescription</key>
-<string>Connexion aux imprimantes Bluetooth compatibles.</string>
-<!-- Si SDK MFi (Epson/Star/Zebra Bluetooth) : déclarer les protocoles -->
+<string>Connect to compatible Bluetooth printers.</string>
+<!-- If using an MFi SDK (Epson/Star/Zebra Bluetooth): declare the protocols -->
 <key>UISupportedExternalAccessoryProtocols</key>
 <array>
   <string>com.epson.escpos</string>
@@ -202,7 +202,7 @@ Appeler `requestPermissions()` avant le premier scan.
 </array>
 ```
 
-## API publique
+## Public API
 
 ```ts
 import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
@@ -214,36 +214,36 @@ ThermalPrinter.setDefaultPrinter({ printerId })                          // → 
 ThermalPrinter.getDefaultPrinter()                                       // → { profile | null }
 ThermalPrinter.getSavedPrinters()                                        // → { profiles }
 ThermalPrinter.removePrinter({ printerId })                              // → void
-ThermalPrinter.printImage(options)                                       // → PrintResult (await = imprimé)
-ThermalPrinter.printText({ items, ... })                                 // → PrintResult (await = imprimé)
+ThermalPrinter.printImage(options)                                       // → PrintResult (await = printed)
+ThermalPrinter.printText({ items, ... })                                 // → PrintResult (await = printed)
 ThermalPrinter.getPrinterStatus({ printerId? })                          // → PrinterStatus
 ThermalPrinter.requestPermissions() / checkPermissions()                 // → PermissionStatus
-ThermalPrinter.startStatusMonitor({ printerId, intervalMs? })            // Phase 6
-ThermalPrinter.stopStatusMonitor({ printerId })                          // Phase 6
+ThermalPrinter.startStatusMonitor({ printerId, intervalMs? })            // background status polling
+ThermalPrinter.stopStatusMonitor({ printerId })
 ThermalPrinter.getActiveSdks()                                           // → { sdks: SdkStatus[] }
 ThermalPrinter.getDebugLog()                                             // → { log: DebugLogEntry[] }
 
 // Events
-ThermalPrinter.addListener('printerFound', e => ...)        // résultats de scan incrémentaux
+ThermalPrinter.addListener('printerFound', e => ...)        // incremental scan results
 ThermalPrinter.addListener('discoveryComplete', e => ...)
-ThermalPrinter.addListener('statusChange', e => ...)        // PrinterStatus (papier/capot/connexion)
+ThermalPrinter.addListener('statusChange', e => ...)        // PrinterStatus (paper/cover/connection)
 ThermalPrinter.addListener('printJobStatus', e => ...)      // JobState: pending/printing/hold/completed/failed
 ```
 
-> **`connectPrinter({ setAsDefault: true })`** définit l'imprimante par défaut
-> **uniquement si la connexion réussit** (`connect` + `setDefaultPrinter` en une étape,
-> sans persister une imprimante injoignable).
+> **`connectPrinter({ setAsDefault: true })`** sets the default printer **only if
+> the connection succeeds** (`connect` + `setDefaultPrinter` in one step, without
+> persisting an unreachable printer).
 
-### Fin d'impression / `await`
+### Print completion / `await`
 
-`printImage` et `printText` sont **asynchrones et se résolvent quand l'impression
-physique est terminée** (best-effort) — on peut donc `await`. Précisions :
+`printImage` and `printText` are **async and resolve when physical printing is done**
+(best-effort) — so you can `await` them. Details:
 
-- **SDK fabricants** : la promesse attend le **callback de fin** du SDK (fiabilité max).
-- **ESC/POS TCP/SPP** : canal **unidirectionnel** → la promesse se résout quand tous
-  les octets sont **écrits et flushés**. Un **pré-contrôle de statut** est fait avant
-  l'envoi : papier vide / capot ouvert → job en `hold` + rejet `PAPER_EMPTY` /
-  `COVER_OPEN` (`retryable: true`).
+- **Manufacturer SDKs**: the promise waits for the SDK's **completion callback** (max reliability).
+- **ESC/POS TCP/SPP**: a **one-way** channel → the promise resolves once all bytes are
+  **written and flushed**. A **status pre-check** runs before sending: paper empty /
+  cover open → job set to `hold` + rejection `PAPER_EMPTY` / `COVER_OPEN`
+  (`retryable: true`).
 
 ## Types
 
@@ -254,7 +254,7 @@ type PrinterAdapterId = 'escpos' | 'epson' | 'star' | 'brother' | 'zebra' | 'raw
 interface PrinterCapabilities {
   paperWidthMm: number;        // 58 | 80 | 112…
   printableDots: number;       // 384 (58mm) | 576 (80mm) | 832 (112mm)
-  dpi: number;                 // 203 le plus souvent
+  dpi: number;                 // 203 most of the time
   supportsCut: boolean;
   supportsCashDrawer: boolean;
   supportsStatus: boolean;
@@ -264,11 +264,11 @@ interface PrinterCapabilities {
 }
 
 interface DiscoveredPrinter {
-  id: string;                  // id stable: "wifi:192.168.1.50", "bluetooth:AA:BB:.."
+  id: string;                  // stable id: "wifi:192.168.1.50", "bluetooth:AA:BB:.."
   name: string;
   brand?: string; model?: string;
   transport: PrinterTransport;
-  adapter: PrinterAdapterId;   // résolu par la priorité
+  adapter: PrinterAdapterId;   // resolved by priority
   address: string;             // "ip:port" | MAC | UUID
   capabilities?: Partial<PrinterCapabilities>;
   discoveredBy?: PrinterAdapterId[];
@@ -291,7 +291,7 @@ interface PrinterProfile {
   createdAt: number; updatedAt: number;
 }
 
-// ---- États / statuts ----
+// ---- States / statuses ----
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 type PaperStatus = 'ok' | 'near_end' | 'empty' | 'unknown';
 type JobState = 'pending' | 'printing' | 'hold' | 'completed' | 'failed' | 'canceled';
@@ -323,39 +323,48 @@ interface PrintResult {
   success: boolean;
   printerId: string;
   adapter: PrinterAdapterId;
-  jobId: string;            // corrélé aux events printJobStatus
-  state: JobState;          // 'completed' si succès
+  jobId: string;            // correlated with printJobStatus events
+  state: JobState;          // 'completed' on success
   bytesSent?: number;
   durationMs?: number;
   status?: PrinterStatus;
 }
 
-// ---- Options d'impression image ----
+// ---- Image print options ----
 type DitheringAlgorithm = 'none' | 'floyd_steinberg' | 'atkinson';
 type ImageAlign = 'left' | 'center' | 'right';
 
-interface ImageSource { filePath?: string; url?: string; base64?: string; } // 1 seule clé
+interface ImageSource { filePath?: string; url?: string; base64?: string; } // exactly one key
 
 interface PrintRenderOptions {
-  widthDots?: number;       // sinon déduit du profil (384/576/832)
-  resize?: boolean;         // défaut true ; false = image déjà à la bonne largeur
-  grayscale?: boolean;      // défaut true ; false = image déjà 1-bit (seuil simple)
-  threshold?: number;       // défaut 128 (si dithering 'none' ou grayscale false)
-  dithering?: DitheringAlgorithm; // défaut 'floyd_steinberg'
-  align?: ImageAlign;       // défaut 'center'
+  widthDots?: number;       // otherwise derived from the profile (384/576/832)
+  resize?: boolean;         // default true; false = image already at the right width
+  grayscale?: boolean;      // default true; false = image already 1-bit (simple threshold)
+  threshold?: number;       // default 128 (when dithering 'none' or grayscale false)
+  dithering?: DitheringAlgorithm; // default 'floyd_steinberg'
+  align?: ImageAlign;       // default 'center'
   invert?: boolean;
-  cut?: boolean;            // défaut true
-  feedLines?: number;       // défaut 3
+  cut?: boolean;            // default true
+  feedLines?: number;       // default 3
   openCashDrawer?: boolean;
-  copies?: number;          // défaut 1
+  copies?: number;          // default 1
 }
 
 interface PrintImageOptions {
-  printerId?: string;       // sinon imprimante par défaut
+  printerId?: string;       // otherwise the default printer
   image: ImageSource;
   render?: PrintRenderOptions;
-  timeoutMs?: number;       // défaut 15000
-  autoReconnect?: boolean;  // défaut true
+  timeoutMs?: number;       // default 15000
+  autoReconnect?: boolean;  // default true
+}
+
+// ---- SDK status ----
+interface SdkStatus {
+  adapter: PrinterAdapterId;
+  label: string;
+  available: boolean;       // detected & usable right now
+  requiresSdk: boolean;     // true for brand SDKs, false for built-in adapters
+  transports: PrinterTransport[];
 }
 
 // ---- Events ----
@@ -365,13 +374,13 @@ interface StatusChangeEvent { status: PrinterStatus; }
 interface PrintJobStatusEvent { job: PrintJobStatus; }
 ```
 
-### Types `printText`
+### `printText` types
 
 ```ts
 type TextAlign = 'left' | 'center' | 'right';
 type Underline = 'none' | 'single' | 'double';
 type EscPosFont = 'A' | 'B';
-type CodePage = 'CP437' | 'CP850' | 'CP858' | 'WPC1252' | 'CP852' | 'CP866'; // FR: WPC1252
+type CodePage = 'CP437' | 'CP850' | 'CP858' | 'WPC1252' | 'CP852' | 'CP866'; // Latin-1/Western: WPC1252
 type BarcodeSymbology = 'UPC_A'|'UPC_E'|'EAN13'|'EAN8'|'CODE39'|'ITF'|'CODABAR'|'CODE93'|'CODE128';
 type HriPosition = 'none' | 'above' | 'below' | 'both';
 type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
@@ -384,14 +393,14 @@ interface TextStyle {
   widthMultiplier?: number;   // 1..8
   heightMultiplier?: number;  // 1..8
   doubleStrike?: boolean;
-  invert?: boolean;           // blanc sur noir
+  invert?: boolean;           // white on black
   upsideDown?: boolean;
   rotate90?: boolean;
   letterSpacing?: number;     // dots
-  lineSpacing?: number;       // dots (sinon défaut)
+  lineSpacing?: number;       // dots (otherwise default)
   codePage?: CodePage;
-  codePageId?: number;        // override brut ESC t n
-  newline?: boolean;          // défaut true
+  codePageId?: number;        // raw ESC t n override
+  newline?: boolean;          // default true
 }
 
 type PrintItem =
@@ -408,193 +417,198 @@ type PrintItem =
 interface PrintTextOptions {
   printerId?: string;
   items: PrintItem[];
-  defaultCodePage?: CodePage; // FR: 'WPC1252'
-  cut?: boolean;              // défaut false
-  feedLines?: number;         // défaut 3
+  defaultCodePage?: CodePage; // Western/Latin-1: 'WPC1252'
+  cut?: boolean;              // default false
+  feedLines?: number;         // default 3
   timeoutMs?: number;
   autoReconnect?: boolean;
 }
 ```
 
-## Flux d'impression d'image
+## Image printing flow
 
-`printImage` exécute exactement :
+`printImage` performs exactly:
 
-1. Résout l'imprimante cible (sinon **imprimante par défaut**).
-2. Vérifie si elle est connectée.
-3. Sinon, **reconnexion automatique** (si `autoReconnect`, défaut `true`).
-4. **Ouvre l'image** (`filePath` > `url` (cache) > `base64`).
-5. **Redimensionne** à la largeur exacte (`widthDots` ou capacités du profil).
-6. **Niveaux de gris** (luminance BT.601), aplatissement sur fond blanc (PNG transparent).
-7. **Dithering** (Floyd-Steinberg par défaut, Atkinson ou seuil).
-8. **Conversion vers l'adapter** (raster `GS v 0` pour ESC/POS, `addImage` pour SDK, ZPL pour Zebra).
-9. **Envoi** (par chunks adaptés au transport).
-10. **Feed + coupe** (si supporté) + tiroir-caisse optionnel.
-11. **Résultat normalisé** + lecture de statut best-effort.
+1. Resolve the target printer (otherwise the **default printer**).
+2. Check whether it is connected.
+3. If not, **automatic reconnection** (when `autoReconnect`, default `true`).
+4. **Open the image** (`filePath` > `url` (cached) > `base64`).
+5. **Resize** to the exact width (`widthDots` or the profile's capabilities).
+6. **Grayscale** (BT.601 luminance), flatten onto a white background (transparent PNG).
+7. **Dithering** (Floyd-Steinberg by default, Atkinson, or threshold).
+8. **Convert to the adapter** (`GS v 0` raster for ESC/POS, `addImage` for SDKs, ZPL for Zebra).
+9. **Send** (in transport-sized chunks).
+10. **Feed + cut** (if supported) + optional cash drawer.
+11. **Normalized result** + best-effort status read.
 
 ```ts
 await ThermalPrinter.printImage({
-  // printerId omis → imprimante par défaut
-  image: { filePath: '/data/.../ticket.png' },   // recommandé en prod
+  // printerId omitted → default printer
+  image: { filePath: '/data/.../receipt.png' },   // recommended in production
   render: { dithering: 'floyd_steinberg', cut: true, feedLines: 3, align: 'center' },
   timeoutMs: 15000,
   autoReconnect: true,
 });
 ```
 
-### Exemples concrets d'impression d'image
+### Concrete image-printing examples
 
 ```ts
-// 1) Fichier local (RECOMMANDÉ en production) — le plus fiable/performant
-await ThermalPrinter.printImage({ image: { filePath: '/data/user/0/app/files/ticket.png' } });
+// 1) Local file (RECOMMENDED in production) — most reliable/performant
+await ThermalPrinter.printImage({ image: { filePath: '/data/user/0/app/files/receipt.png' } });
 
-// 2) URL distante — téléchargée et mise en cache par le plugin
+// 2) Remote URL — downloaded and cached by the plugin
 await ThermalPrinter.printImage({
-  image: { url: 'https://api.resto.app/tickets/123/render.png' },
+  image: { url: 'https://api.example.com/receipts/123/render.png' },
   render: { dithering: 'atkinson', cut: true },
 });
 
-// 3) base64 (pratique pour les tests, moins performant)
+// 3) base64 (handy for tests, less performant)
 await ThermalPrinter.printImage({ image: { base64: 'iVBORw0KGgoAAAANS...' } });
 
-// 4) Image DÉJÀ rendue serveur à la bonne largeur et en 1-bit noir/blanc :
-//    on désactive resize + grayscale → envoi pixel-perfect, plus rapide.
+// 4) Image ALREADY rendered server-side at the right width and as 1-bit black/white:
+//    disable resize + grayscale → pixel-perfect, faster send.
 await ThermalPrinter.printImage({
-  image: { filePath: '/data/.../ticket_576px_1bit.png' },
+  image: { filePath: '/data/.../receipt_576px_1bit.png' },
   render: { resize: false, grayscale: false, cut: true },
 });
 
-// 5) Cibler une imprimante précise + 2 copies + tiroir-caisse
+// 5) Target a specific printer + 2 copies + cash drawer
 await ThermalPrinter.printImage({
   printerId: 'wifi:192.168.1.50',
-  image: { filePath: '/data/.../ticket.png' },
+  image: { filePath: '/data/.../receipt.png' },
   render: { widthDots: 576, copies: 2, openCashDrawer: true },
 });
 
-// 6) await = imprimé (best-effort) ; gestion d'erreur typée
+// 6) await = printed (best-effort); typed error handling
 try {
   const res = await ThermalPrinter.printImage({ image: { filePath } });
-  console.log('Imprimé', res.jobId, res.bytesSent, 'octets en', res.durationMs, 'ms');
+  console.log('Printed', res.jobId, res.bytesSent, 'bytes in', res.durationMs, 'ms');
 } catch (e) {
-  if ((e as PrinterError).code === PrintErrorCode.PAPER_EMPTY) alert('Plus de papier');
+  if ((e as PrinterError).code === PrintErrorCode.PAPER_EMPTY) alert('Out of paper');
 }
 ```
 
-> **`resize`/`grayscale` optionnels** : si votre serveur génère déjà un PNG à la
-> largeur exacte (`576px`/`384px`) et en noir/blanc 1-bit, passez
-> `render: { resize: false, grayscale: false }`. Le plugin applique alors un simple
-> seuil (pas de dithering) et n'altère pas la géométrie.
+> **`resize`/`grayscale` are optional**: if your server already produces a PNG at the
+> exact width (`576px`/`384px`) and 1-bit black/white, pass
+> `render: { resize: false, grayscale: false }`. The plugin then applies a simple
+> threshold (no dithering) and does not alter the geometry.
 
-## Impression de texte (`printText`)
+## Text printing (`printText`)
 
-`printText` accepte un **tableau ordonné d'items typés**. Idéal pour les tickets
-purement textuels, sans pré-rendu serveur.
+`printText` accepts an **ordered array of typed items**. Ideal for purely textual
+output, with no server-side pre-rendering.
 
 ```ts
 await ThermalPrinter.printText({
-  defaultCodePage: 'WPC1252', // accents FR
+  defaultCodePage: 'WPC1252', // Western/Latin-1 accents
   items: [
-    { type: 'text', value: 'LE RESTO', style: { align: 'center', bold: true, widthMultiplier: 2, heightMultiplier: 2 } },
-    { type: 'text', value: '12 rue des Lilas — Paris', style: { align: 'center' } },
+    { type: 'text', value: 'MY STORE', style: { align: 'center', bold: true, widthMultiplier: 2, heightMultiplier: 2 } },
+    { type: 'text', value: '12 Main Street', style: { align: 'center' } },
     { type: 'divider', char: '-' },
-    { type: 'text', value: 'Table 7', style: { bold: true } },
-    { type: 'text', value: 'Burger............12.00 €' },
-    { type: 'text', value: 'Café.............. 2.00 €' },
+    { type: 'text', value: 'Order #1042', style: { bold: true } },
+    { type: 'text', value: 'Item A...........12.00' },
+    { type: 'text', value: 'Item B........... 2.00' },
     { type: 'divider' },
-    { type: 'text', value: 'TOTAL  14.00 €', style: { align: 'right', bold: true, widthMultiplier: 2 } },
+    { type: 'text', value: 'TOTAL  14.00', style: { align: 'right', bold: true, widthMultiplier: 2 } },
     { type: 'feed', lines: 1 },
-    { type: 'qrcode', value: 'https://resto.app/avis/123', size: 6, align: 'center' },
+    { type: 'qrcode', value: 'https://example.com/order/1042', size: 6, align: 'center' },
     { type: 'barcode', value: '4006381333931', symbology: 'EAN13', hri: 'below' },
     { type: 'cut', mode: 'partial', feedBefore: 3 },
   ],
 });
 ```
 
-### Styles supportés (ESC/POS) et correspondance SDK
+### Supported styles (ESC/POS) and SDK mapping
 
 | Style / item | ESC/POS (escpos, rawTcp) | Epson ePOS2 | Star StarXpand | Brother | Zebra (ZPL) |
 |---|:--:|:--:|:--:|:--:|:--:|
-| `align` (left/center/right) | ✅ `ESC a` | ✅ | ✅ | ✅ | ✅ (champ) |
-| `bold` | ✅ `ESC E` | ✅ | ✅ | ✅ | ⚠️ via police |
+| `align` (left/center/right) | ✅ `ESC a` | ✅ | ✅ | ✅ | ✅ (field) |
+| `bold` | ✅ `ESC E` | ✅ | ✅ | ✅ | ⚠️ via font |
 | `underline` (single/double) | ✅ `ESC -` | ✅ | ✅ | ⚠️ | ❌ |
 | `font` A/B | ✅ `ESC M` | ✅ | ✅ | ⚠️ | ⚠️ |
-| `widthMultiplier`/`heightMultiplier` (1..8) | ✅ `GS !` | ✅ | ✅ | ✅ | ✅ (taille) |
+| `widthMultiplier`/`heightMultiplier` (1..8) | ✅ `GS !` | ✅ | ✅ | ✅ | ✅ (size) |
 | `doubleStrike` | ✅ `ESC G` | ✅ | ⚠️ | ❌ | ❌ |
-| `invert` (blanc/noir) | ✅ `GS B` | ✅ | ✅ | ⚠️ | ✅ (reverse) |
+| `invert` (white/black) | ✅ `GS B` | ✅ | ✅ | ⚠️ | ✅ (reverse) |
 | `upsideDown` | ✅ `ESC {` | ✅ | ⚠️ | ❌ | ✅ |
 | `rotate90` | ✅ `ESC V` | ✅ | ⚠️ | ⚠️ | ✅ |
 | `letterSpacing` | ✅ `ESC SP` | ✅ | ⚠️ | ❌ | ⚠️ |
 | `lineSpacing` | ✅ `ESC 3` | ✅ | ✅ | ⚠️ | ✅ |
 | `codePage` (accents) | ✅ `ESC t` | ✅ | ✅ | ✅ | ✅ |
-| `qrcode` | ✅ `GS ( k` | ✅ natif | ✅ natif | ✅ natif | ✅ `^BQ` |
-| `barcode` (EAN/CODE128…) | ✅ `GS k` | ✅ natif | ✅ natif | ✅ natif | ✅ `^BC`… |
+| `qrcode` | ✅ `GS ( k` | ✅ native | ✅ native | ✅ native | ✅ `^BQ` |
+| `barcode` (EAN/CODE128…) | ✅ `GS k` | ✅ native | ✅ native | ✅ native | ✅ `^BC`… |
 | `divider` / `feed` / `cut` | ✅ | ✅ | ✅ | ✅ | ✅ |
 | `cashDrawer` | ✅ `ESC p` | ✅ | ✅ | ⚠️ | ⚠️ |
-| `image` (intercalée) | ✅ raster | ✅ addImage | ✅ actionPrintImage | ✅ printImage | ✅ ^GF |
-| `raw` (octets bruts) | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ (ZPL brut) |
+| `image` (inline) | ✅ raster | ✅ addImage | ✅ actionPrintImage | ✅ printImage | ✅ ^GF |
+| `raw` (raw bytes) | ✅ | ⚠️ | ⚠️ | ❌ | ⚠️ (raw ZPL) |
 
-> ✅ supporté · ⚠️ partiel/équivalent selon modèle · ❌ non disponible.
-> Les styles non supportés par un SDK sont **ignorés proprement** (jamais d'échec dur).
-> L'encodeur ESC/POS de référence est dans `src/core/escpos-text.ts` (testé), mirroré
-> en Kotlin (`EscPosTextEncoder.kt`) et Swift (`EscPosTextEncoder.swift`).
+> ✅ supported · ⚠️ partial/model-dependent equivalent · ❌ not available.
+> Styles not supported by an SDK are **ignored gracefully** (never a hard failure).
+> The reference ESC/POS encoder lives in `src/core/escpos-text.ts` (tested), mirrored
+> in Kotlin (`EscPosTextEncoder.kt`) and Swift (`EscPosTextEncoder.swift`).
 
-## Événements & statut côté client
+> **`printText` per brand.** It works on all brands: ESC/POS and **Star** (both
+> platforms) and **Epson Android** map text to a native builder; **Epson iOS,
+> Brother, Zebra** fall back automatically to **rendering the items to an image**
+> (`TextRasterizer`) printed via the SDK's image path. See `docs/SDK_INTEGRATION.md`.
+
+## Client-side events & status
 
 ```ts
-// Suivi des jobs : pending → printing → completed | hold | failed
+// Job tracking: pending → printing → completed | hold | failed
 const jobSub = await ThermalPrinter.addListener('printJobStatus', ({ job }) => {
   switch (job.state) {
     case 'printing': showSpinner(job.progress); break;
-    case 'hold':     toast(job.holdReason === 'paper_empty' ? 'Ajoutez du papier' : 'Capot ouvert'); break;
+    case 'hold':     toast(job.holdReason === 'paper_empty' ? 'Add paper' : 'Cover open'); break;
     case 'completed': hideSpinner(); break;
-    case 'failed':   alert(`Échec: ${job.errorCode}`); break;
+    case 'failed':   alert(`Failed: ${job.errorCode}`); break;
   }
 });
 
-// Statut imprimante (connexion, papier, capot)
+// Printer status (connection, paper, cover)
 const statusSub = await ThermalPrinter.addListener('statusChange', ({ status }) => {
   updateBadge(status.online, status.paper); // 'ok' | 'near_end' | 'empty' | 'unknown'
 });
 
-// ... plus tard
+// ... later
 await jobSub.remove();
 await statusSub.remove();
 ```
 
+## Image processing
 
+- **Reference widths @203 dpi**: `58mm → 384 px`, `80mm → 576 px`, `112mm → 832 px`. Some 80mm models print `640 px`: **always prefer the profile/SDK `printableDots`** when known.
+- **Pipeline**: proportional resize to the target width → grayscale → binarization.
+- **Dithering**:
+  - `none` (threshold): crisp for text/lines.
+  - `floyd_steinberg` (**default**): logos/photos.
+  - `atkinson`: more contrast, pleasant on receipts.
+- **ESC/POS raster**: `GS v 0` command (`0x1D 0x76 0x30 m xL xH yL yH data`), width padded to a multiple of 8, MSB = leftmost pixel. Testable reference implementation in `src/core/imaging.ts`, mirrored in Kotlin (`ImageProcessor.kt`) and Swift (`ImageProcessor.swift`).
 
-- **Largeurs de référence @203 dpi** : `58mm → 384 px`, `80mm → 576 px`, `112mm → 832 px`. Certains 80mm impriment `640 px` : on **privilégie toujours `printableDots` du profil/SDK** quand connu.
-- **Pipeline** : redimensionnement proportionnel à la largeur cible → niveaux de gris → binarisation.
-- **Dithering** :
-  - `none` (seuil) : net pour le texte/lignes.
-  - `floyd_steinberg` (**défaut**) : logos/photos.
-  - `atkinson` : plus contrasté, agréable sur ticket.
-- **Raster ESC/POS** : commande `GS v 0` (`0x1D 0x76 0x30 m xL xH yL yH data`), largeur paddée au multiple de 8, MSB = pixel le plus à gauche. Implémentation de référence testable dans `src/core/imaging.ts`, mirrorée en Kotlin (`ImageProcessor.kt`) et Swift (`ImageProcessor.swift`).
+## Aggregated discovery & adapter priority
 
-## Découverte agrégée & priorité d'adapter
+Several sources run **in parallel**: Epson/Star/Brother/Zebra SDKs, TCP 9100 scan, Bluetooth Classic (Android), BLE (allowlisted services), USB (Android). Results are **merged** by stable `id` and **deduplicated**.
 
-Plusieurs sources tournent **en parallèle** : SDK Epson/Star/Brother/Zebra, scan TCP 9100, Bluetooth classique (Android), BLE (optionnel), USB (Android). Les résultats sont **fusionnés** par `id` stable et **dédoublonnés**.
+**Priority rules** (`priority.ts` / `AdapterPriority.kt` / `.swift`):
 
-**Règles de priorité** (`priority.ts` / `AdapterPriority.kt` / `.swift`) :
-
-| Cas | Adapter retenu | Score |
+| Case | Selected adapter | Score |
 |---|---|---|
-| Imprimante reconnue par un SDK officiel | `epson` / `star` / `brother` | 880–900 |
-| **Zebra** | **`zebra` uniquement** (ESC/POS banni) | 1000 / −1000 |
-| ESC/POS confirmé en Bluetooth (Android) | `escpos` | 620 |
-| ESC/POS confirmé en TCP | `escpos` | 600 |
-| BLE avec service exploitable | (BLE) | 500 |
-| Réseau non identifié | `rawTcp` | 300 |
+| Printer recognized by an official SDK | `epson` / `star` / `brother` | 880–900 |
+| **Zebra** | **`zebra` only** (ESC/POS banned) | 1000 / −1000 |
+| ESC/POS confirmed over Bluetooth (Android) | `escpos` | 620 |
+| ESC/POS confirmed over TCP | `escpos` | 600 |
+| BLE with a usable service | (BLE) | 500 |
+| Unidentified network device | `rawTcp` | 300 |
 
-## Imprimante par défaut & reconnexion
+## Default printer & reconnection
 
-- Après un **test d'impression réussi**, l'app appelle `setDefaultPrinter({ printerId })` : le plugin **persiste un `PrinterProfile`** (id, adapter, transport, adresse, marque, modèle, largeur papier, `printableDots`, dpi, options de coupe, métadonnées de reconnexion).
-- Au **démarrage** ou **avant impression**, le plugin relit ce profil.
-- **La reconnexion n'est pas une connexion permanente** : elle est tentée **juste avant `printImage`** (étape 3). Cela évite de garder un socket/Bluetooth ouvert inutilement et améliore la fiabilité en restauration.
+- After a **successful test print**, the app calls `setDefaultPrinter({ printerId })`: the plugin **persists a `PrinterProfile`** (id, adapter, transport, address, brand, model, paper width, `printableDots`, dpi, cut options, reconnection metadata).
+- On **startup** or **before printing**, the plugin reloads this profile.
+- **Reconnection is not a permanent connection**: it is attempted **just before `printImage`** (step 3). This avoids keeping a socket/Bluetooth link open needlessly and improves reliability for occasional printing. It uses **exponential backoff** (up to 3 attempts) and detects recovery after a `hold` (paper reloaded / cover closed / back online).
 
-## Erreurs normalisées
+## Normalized errors
 
-Toutes les promesses rejetées portent un **code stable** (`error.code`) :
+Every rejected promise carries a **stable code** (`error.code`):
 
 `PRINTER_NOT_FOUND`, `PRINTER_OFFLINE`, `CONNECTION_FAILED`, `PERMISSION_DENIED`, `BLUETOOTH_DISABLED`, `WIFI_NOT_CONNECTED`, `PAIRING_REQUIRED`, `UNSUPPORTED_TRANSPORT`, `UNSUPPORTED_PRINTER`, `IMAGE_INVALID`, `IMAGE_TOO_LARGE`, `PRINT_FAILED`, `PAPER_EMPTY`, `COVER_OPEN`, `SDK_NOT_AVAILABLE`, `TIMEOUT`, `UNKNOWN`.
 
@@ -607,96 +621,96 @@ catch (e) {
 }
 ```
 
-## Différences Android / iOS
+## Android / iOS differences
 
-### Android — large couverture matérielle
-- Permissions Bluetooth modernes (12+) gérées.
-- **Bluetooth Classic / SPP** : pris en charge → ESC/POS génériques très répandus. ✅
-- BLE pris en charge (allowlist d'UUID conseillée).
-- Récupération des **appareils déjà appairés** (instantané, sans scan).
+### Android — broad hardware coverage
+- Modern Bluetooth permissions (12+) handled.
+- **Bluetooth Classic / SPP**: supported → covers the very common generic ESC/POS printers. ✅
+- BLE supported (UUID allowlist recommended).
+- Retrieval of **already-paired devices** (instant, no scan).
 - TCP 9100 (Wi-Fi/Ethernet). ✅
-- USB host (optionnel).
+- USB host (optional).
 
-### iOS — contraintes Apple
-- ❌ **Pas de Bluetooth Classic / SPP générique.** Une imprimante BT « chinoise » générique **n'est pas adressable** sauf si elle expose un service BLE exploitable.
-- ✅ **SDK fabricants MFi** (Epson/Star/Brother/Zebra) : c'est **la** voie pour le Bluetooth sur iOS.
-- ✅ **Wi-Fi TCP** (port 9100) via `Network.framework` → déclencher la pop-up **Réseau local**.
-- ❌ **Pas de GATT BLE générique exposé par le plugin sur iOS.** Le BLE passe par les
-  SDK MFi (Star/Epson/Brother). Tenter un transport `ble`/`bluetooth`/`usb` sur
-  l'adapter ESC/POS générique renvoie une erreur `UNSUPPORTED_TRANSPORT` explicite.
-- ❌ Pas d'USB host pour ce cas.
+### iOS — Apple constraints
+- ❌ **No generic Bluetooth Classic / SPP.** A generic "no-name" BT printer **is not addressable** unless it exposes a usable BLE service.
+- ✅ **MFi manufacturer SDKs** (Epson/Star/Brother/Zebra): this is **the** path for Bluetooth on iOS.
+- ✅ **Wi-Fi TCP** (port 9100) via `Network.framework` → triggers the **Local Network** prompt.
+- ❌ **No generic BLE GATT exposed by the plugin on iOS.** BLE goes through the MFi
+  SDKs (Star/Epson/Brother). Attempting a `ble`/`bluetooth`/`usb` transport on the
+  generic ESC/POS adapter returns an explicit `UNSUPPORTED_TRANSPORT` error.
+- ❌ No USB host for this use case.
 
-> **Ne promettez jamais** une compatibilité Bluetooth universelle sur iOS. En pratique : **Wi-Fi pour tout le monde, Bluetooth via SDK fabricant**.
+> **Never promise** universal Bluetooth compatibility on iOS. In practice: **Wi-Fi for everyone, Bluetooth via the manufacturer SDK**.
 
-## Cache image & logs/diagnostic
+## Image cache & logs/diagnostics
 
-- **Cache** : les images `url` sont téléchargées dans `cache/thermal-images/` (clé = hash de l'URL, quota 32 Mo, purge LRU). Le mode `filePath` reste le plus fiable.
-- **Logs** : ring-buffer en mémoire (500 lignes) + Logcat/os_log. Récupérables via `getDebugLog()` pour un écran « Diagnostic » joignable au support. Jamais de données image brutes (seulement dimensions/octets).
+- **Cache**: `url` images are downloaded into `cache/thermal-images/` (key = URL hash, 32 MB quota, LRU eviction). The `filePath` mode remains the most reliable.
+- **Logs**: in-memory ring buffer (500 lines) + Logcat/os_log. Retrievable via `getDebugLog()` for a "Diagnostics" screen attachable to support tickets. Never raw image data (only dimensions/byte counts).
 
-## Tests & qualité
+## Tests & quality
 
-- **TypeScript (Vitest)** : la logique métier pure (imaging, encodeur ESC/POS texte,
-  priorité d'adapter, dédoublonnage, erreurs, fallback web) est couverte par **65 tests**
-  avec un **coverage > 90 %** (seuils CI : 85 % lignes/fonctions, 80 % branches).
+- **TypeScript (Vitest)**: the pure business logic (imaging, ESC/POS text encoder,
+  adapter priority, deduplication, errors, web fallback) is covered by **66 tests**
+  with **~94% coverage** (CI thresholds: 85% lines/functions, 80% branches).
 
   ```bash
-  npm test            # exécute la suite Vitest
+  npm test            # run the Vitest suite
   npm run test:coverage
   ```
 
-- **Android (JUnit)** : `android/src/test/...` valide les encodeurs ESC/POS texte et raster
-  (mêmes assertions octet-à-octet que les tests TS) → `./gradlew test`.
-- **Coverage connexion SDK** : les adapters réflexifs (Epson/Zebra/Brother) sont couverts
-  via un **faux SDK sur le classpath de test** (Robolectric, sans binaire ni imprimante) +
-  JaCoCo. Exemple fourni pour Epson (`EpsonAdapterTest`, `SdkReflectTest`).
-  → `./gradlew testDebugUnitTest jacocoTestReport`. Voir **[`docs/TESTING_SDK.md`](docs/TESTING_SDK.md)**.
-- **iOS (XCTest)** : `ios/Tests/...` valide l'encodeur (mêmes vecteurs) → `xcodebuild test`.
-- **Tests d'intégration SDK** (couche 3) : sur matériel réel quand les SDK sont liés (voir ROADMAP).
+- **Android (JUnit)**: `android/src/test/...` validates the ESC/POS text and raster
+  encoders (same byte-for-byte assertions as the TS tests) → `./gradlew test`.
+- **SDK connection coverage**: the reflection-based adapters (Epson/Zebra/Brother) are
+  covered via a **fake SDK on the test classpath** (Robolectric, no binary or printer) +
+  JaCoCo. Example provided for Epson (`EpsonAdapterTest`, `SdkReflectTest`).
+  → `./gradlew testDebugUnitTest jacocoTestReport`. See **[`docs/TESTING_SDK.md`](docs/TESTING_SDK.md)**.
+- **iOS (XCTest)**: `ios/Tests/...` validates the encoder (same vectors) → `xcodebuild test`.
+- **SDK integration tests** (layer 3): on real hardware once the SDKs are linked (see ROADMAP).
 
-## Plan d'implémentation par phases
+## Implementation phases
 
-Légende : ✅ fait & vérifiable (TS/transports/logique plugin) · ✅◷ implémenté, **à valider sur device** (code natif SDK non compilé dans ce dépôt) · 🟡 partiel.
+Legend: ✅ done & verifiable (TS/transports/plugin logic) · ✅◷ implemented, **needs on-device validation** (native SDK code not compiled in this repo) · 🟡 partial.
 
-| Phase | Contenu | État |
+| Phase | Content | Status |
 |---|---|---|
-| **1** | Scaffold plugin, types TS, registry d'adapters, store imprimante par défaut, **ESC/POS via Wi-Fi TCP 9100** | ✅ |
-| **2** | **Bluetooth classique Android** (SPP) pour ESC/POS | ✅ |
-| **3** | **SDK Star** (auto-download Maven/SPM, appels typés) **+ Epson** (Android réflexion / iOS `canImport`) | ✅ Star · ✅◷ Epson |
-| **4** | **iOS** : Wi-Fi TCP + SDK Star/Epson ; **BLE via SDK MFi** (pas de GATT générique exposé) | ✅ |
-| **5** | **Brother + Zebra** (Android réflexion / iOS `canImport` ; Brother iOS via pod) | ✅◷ |
-| **6** | **Monitoring** (`start/stopStatusMonitor`) + **reconnexion backoff** + **reprise après hold** + logs/events | ✅ |
-| **+** | **Transports Android** : **BLE GATT** (MTU, allowlist UUID) + **USB host** (bulk OUT) | ✅◷ |
-| **+** | **`printText` stylé** : ESC/POS natif + **Star** natif + **Epson Android** natif ; **Brother/Zebra/Epson-iOS → repli image** (`TextRasterizer`) | ✅ |
-| **+** | **`getActiveSdks()`** (SDK actifs au runtime) + **events de job** | ✅ |
-| **+** | **Tests** : TS ~94 % · coverage connexion SDK via **faux SDK** (Epson) + JaCoCo · contrat de réflexion | ✅ TS · 🟡 natif partiel |
+| **1** | Plugin scaffold, TS types, adapter registry, default-printer store, **ESC/POS over Wi-Fi TCP 9100** | ✅ |
+| **2** | **Android Bluetooth Classic** (SPP) for ESC/POS | ✅ |
+| **3** | **Star SDK** (auto-download Maven/SPM, typed calls) **+ Epson** (Android reflection / iOS `canImport`) | ✅ Star · ✅◷ Epson |
+| **4** | **iOS**: Wi-Fi TCP + Star/Epson SDK; **BLE via MFi SDK** (no generic GATT exposed) | ✅ |
+| **5** | **Brother + Zebra** (Android reflection / iOS `canImport`; Brother iOS via pod) | ✅◷ |
+| **6** | **Monitoring** (`start/stopStatusMonitor`) + **backoff reconnection** + **hold recovery** + logs/events | ✅ |
+| **+** | **Android transports**: **BLE GATT** (MTU, UUID allowlist) + **USB host** (bulk OUT) | ✅◷ |
+| **+** | **Styled `printText`**: native ESC/POS + **Star** native + **Epson Android** native; **Brother/Zebra/Epson-iOS → image fallback** (`TextRasterizer`) | ✅ |
+| **+** | **`getActiveSdks()`** (active SDKs at runtime) + **job events** | ✅ |
+| **+** | **Tests**: TS ~94% · SDK connection coverage via **fake SDK** (Epson) + JaCoCo · reflection contract | ✅ TS · 🟡 native partial |
 
-Voir [`ROADMAP.md`](ROADMAP.md) pour le détail et [`docs/TESTING_SDK.md`](docs/TESTING_SDK.md) pour la stratégie de tests.
+See [`ROADMAP.md`](ROADMAP.md) for details and [`docs/TESTING_SDK.md`](docs/TESTING_SDK.md) for the testing strategy.
 
-## Exemple complet
+## Full example
 
 ```ts
 import { ThermalPrinter, PrinterError } from '@delicity/capacitor-thermal-printer';
 
-// 1) Découverte (avec résultats incrémentaux)
+// 1) Discovery (with incremental results)
 const sub = await ThermalPrinter.addListener('printerFound', e => {
-  console.log('Trouvée :', e.printer.name, e.printer.adapter);
+  console.log('Found:', e.printer.name, e.printer.adapter);
 });
 await ThermalPrinter.requestPermissions();
 const { printers } = await ThermalPrinter.discoverPrinters({ timeoutMs: 8000 });
 await sub.remove();
 
-// 2) Connexion qui définit le défaut SI elle réussit, puis test
+// 2) Connect, set as default IF it succeeds, then test print
 const target = printers[0];
 await ThermalPrinter.connectPrinter({ printerId: target.id, setAsDefault: true });
-await ThermalPrinter.printImage({ printerId: target.id, image: { base64: testTicketBase64 } });
+await ThermalPrinter.printImage({ printerId: target.id, image: { base64: testReceiptBase64 } });
 
-// 3) Plus tard : impression simple (imprimante par défaut + reconnexion auto)
-await ThermalPrinter.printImage({ image: { filePath: '/data/.../ticket.png' } });
+// 3) Later: simple print (default printer + auto reconnection)
+await ThermalPrinter.printImage({ image: { filePath: '/data/.../receipt.png' } });
 
-// 4) Ou impression texte stylée
+// 4) Or styled text printing
 await ThermalPrinter.printText({
   items: [
-    { type: 'text', value: 'Merci !', style: { align: 'center', bold: true } },
+    { type: 'text', value: 'Thank you!', style: { align: 'center', bold: true } },
     { type: 'cut' },
   ],
 });
@@ -704,6 +718,6 @@ await ThermalPrinter.printText({
 
 ---
 
-## Licence
+## License
 
 MIT © Delicity
