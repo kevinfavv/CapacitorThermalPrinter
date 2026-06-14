@@ -79,14 +79,7 @@ Follow the official StarXpand steps, in your Xcode app project:
 
 ![Adding the Star iOS package via Swift Package Manager](add_star_ios.gif)
 
-> ⚠️ If Xcode answers `Received invalid response… make sure it is a package collection URL`,
-> the URL went into the wrong place — make sure you used **Add Package Dependencies…** and
-> pasted it into the top-right search field. If it persists, sign in to GitHub under
-> **Xcode ▸ Settings ▸ Accounts**, or try the `…StarXpand-SDK-iOS.git` form.
-
-The `StarAdapter.swift` adapter activates via `#if canImport(StarIO10)`.
-> ⚠️ If the module isn't visible from the plugin's target (Pod), also link `StarIO10` to the
-> `DelicityCapacitorThermalPrinter` pod in your Podfile post-install hook.
+Once this package is added, Star printing is immediately supported on iOS.
 
 ---
 
