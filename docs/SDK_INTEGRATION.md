@@ -140,9 +140,11 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother suppo
 ### iOS
 1. Download the **ePOS SDK for iOS** — [direct download (Epson Download Center)](https://download-center.epson.com/download/?module_id=e5fde6cb-2f38-4bb3-b920-e53ee5b3190f%3A2.37.0&device_id=TM-m10&os=IOS&region=FR&language=fr)
    (or browse from [Epson Developers](https://epson.com/developers-products); Bluetooth MFi: see [MFi / ePOS SDK support](https://global.epson.com/products_and_drivers/tm/en/mfi.html)).
-2. The SDK archive contains three frameworks — drag the **dynamic** one,
-   **`libepos2.xcframework`**, into your Xcode project (app target, *Embed & Sign*).
-   Optionally add `libeposeasyselect.xcframework` (printer-selection helper).
+2. The SDK archive contains three frameworks — take the **dynamic** one,
+   **`libepos2.xcframework`** (optionally also `libeposeasyselect.xcframework`, the
+   printer-selection helper). In Xcode, **drag and drop** it onto the **`App` ▸ Frameworks**
+   group, and in the dialog **tick "Copy items if needed"** so the framework is copied into
+   the project (not just referenced from your Downloads folder). Leave it on **Embed & Sign**.
    > ⚠️ Do **not** also add `libepos2-static.xcframework` — it's the *static* variant of
    > `libepos2` (an alternative, not a complement). Since the Capacitor Podfile uses
    > `use_frameworks!`, use the dynamic `libepos2.xcframework`; adding both causes duplicate
@@ -181,9 +183,9 @@ then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
 1. Download the **Link-OS Multiplatform SDK** (iOS) from the
    [Zebra portal](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk)
    ([downloads & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)).
-2. Add `ZSDK_API.xcframework` to the **`App`** target (*Embed & Sign*) — same procedure as
-   Epson above (use the **+** button under *Frameworks, Libraries, and Embedded Content*, or
-   drag it in). Zebra ships a single framework, so there's no static/dynamic choice.
+2. In Xcode, **drag and drop** `ZSDK_API.xcframework` onto the **`App` ▸ Frameworks** group,
+   and **tick "Copy items if needed"** in the dialog so it's copied into the project. Leave it
+   on **Embed & Sign**. Zebra ships a single framework, so there's no static/dynamic choice.
 3. Once it's on the `App` target, Zebra support turns on by itself. (If your SDK build uses a
    different module name than `ZSDK_API`, adjust it in `ZebraAdapter.swift`.)
 
