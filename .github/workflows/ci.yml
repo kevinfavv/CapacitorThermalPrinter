@@ -18,6 +18,7 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm install
       - run: npm run build
+      - run: npm test                       # vitest (inclut le test d'intégration TCP/imprimante virtuelle)
       - run: node scripts/verify-raster.mjs
 
   android:

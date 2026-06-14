@@ -31,3 +31,6 @@ sdk-binaries/
 coverage/
 
 .claude/worktrees/
+
+# Sorties de l’imprimante virtuelle ESC/POS (scripts/virtual-printer.mjs)
+esc-pos-out/

@@ -124,3 +124,35 @@ build). Depuis le module du plugin :
 
 Robolectric s'exécute sur la JVM : **aucun émulateur** n'est nécessaire pour les
 couches 1 et 2.
+
+## Imprimante ESC/POS virtuelle (TCP) — pipeline complet sans matériel
+
+> Le **Bluetooth n'est simulable sur aucun simulateur** (le simulateur iOS n'a pas
+> de pile BT/BLE, l'émulateur Android non plus). On couvre donc tout le pipeline
+> d'impression via le **transport TCP/9100**, qui, lui, fonctionne en local ET en CI.
+
+`scripts/virtual-printer.mjs` émule une imprimante réseau : elle accepte une connexion
+TCP, capture le flux ESC/POS, le **décode** (init `ESC @`, coupe `GS V`, images raster
+`GS v 0`, texte) et l'enregistre.
+
+### En CI (automatique)
+
+`test/escpos-tcp.integration.spec.ts` démarre l'imprimante virtuelle sur un port
+éphémère, génère un ticket avec l'**encodeur ESC/POS de production**
+(`encodeEscPosItems` / `encodeEscPosRaster`), l'envoie sur une **vraie socket TCP**, puis
+vérifie que les octets reçus sont identiques et bien formés (init, coupe, dimensions
+raster). Lancé par `npm test` (job `web` de la CI). Aucune dépendance, aucun matériel.
+
+### En local (inspection visuelle)
+
+```bash
+npm run printer:virtual                 # écoute sur :9100 (ou `node scripts/virtual-printer.mjs 9100`)
+```
+
+Puis pointe ton app/device sur `<ip-de-ton-mac>:9100` (imprimante réseau Wi-Fi). Chaque
+ticket est dump dans `esc-pos-out/` :
+- `job-N.bin` : octets bruts reçus (rejouables/décortiquables) ;
+- `job-N-imgK.pbm` : chaque image raster, en **PBM 1-bit visualisable** (Aperçu/GIMP/web)
+  — tu vois exactement ce qui aurait été imprimé.
+
+Le terminal affiche un résumé par job (`octets · init · coupe · texte≈ · images=[L×H]`).
