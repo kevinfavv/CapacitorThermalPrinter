@@ -197,6 +197,8 @@ then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
    [How activation works](#how-activation-works-technical-summary)) and `ZebraAdapter.swift`
    activates **automatically** via `#if canImport(ZSDK_API)` (adjust the module name if needed).
 
+![Adding the Zebra iOS xcframework in Xcode](zebra.gif)
+
 `ZebraAdapter.kt` (reflection) activates automatically when the `.jar` is present.
 
 ---
