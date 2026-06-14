@@ -29,3 +29,5 @@ sdk-binaries/
 
 # Tests / coverage
 coverage/
+
+.claude/worktrees/
