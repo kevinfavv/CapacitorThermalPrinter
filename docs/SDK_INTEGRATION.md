@@ -57,10 +57,11 @@ In production, place them in **your own app project** (see the per-brand section
 
 ---
 
-## ⭐ Star (100% automatic)
+## ⭐ Star (no manual binary)
 
-> No manual step on either platform: the SDK is pulled from a public package repository
-> (Maven Central on Android, SPM on iOS), so it's downloaded for you.
+> The SDK comes from a public package repository (Maven Central on Android, SPM on iOS), so
+> there's no binary to download by hand. Android is fully automatic; on iOS you just add the
+> SPM package once.
 
 ### Android ✅ automatic (nothing to do)
 Already wired in `android/build.gradle`:
@@ -70,7 +71,7 @@ implementation "com.starmicronics:stario10:1.12.1"
 Nothing to do: Gradle downloads the SDK from Maven Central. (Bump the version if needed.)
 The `StarAdapter.kt` adapter uses **typed** calls.
 
-### iOS ✅ automatic (just add the SPM package once)
+### iOS (one manual step: add the SPM package)
 The Star iOS SDK is distributed via **Swift Package Manager** (there is no official pod).
 In your Xcode app project:
 1. **File ▸ Add Package Dependencies…**
