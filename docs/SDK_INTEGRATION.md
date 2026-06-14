@@ -98,10 +98,19 @@ Once this package is added, Star printing is immediately supported on iOS.
 4. `BrotherAdapter.kt` (reflection) activates automatically.
 
 ### iOS (one manual step: add the pod)
-Add the pod to your app's `Podfile` (it's published on CocoaPods, so no binary to download):
+Add the pod to your app's `Podfile` (it's published on CocoaPods, so no binary to download).
+In a Capacitor app the Podfile lives at `ios/App/Podfile`; add the line **inside the
+`target 'App'` block**, where the `# Add your Pods here` comment is:
+
 ```ruby
-pod 'BRLMPrinterKit', '~> 4.12'
+target 'App' do
+  capacitor_pods
+  # Add your Pods here
+  pod 'BRLMPrinterKit', '~> 4.12'
+end
 ```
+
+Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
 `BrotherAdapter.swift` activates via `#if canImport(BRLMPrinterKit)`.
 
 ---
