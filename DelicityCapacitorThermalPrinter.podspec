@@ -20,7 +20,13 @@ Pod::Spec.new do |s|
   # le dossier de produits de build est l'endroit où tous ces frameworks atterrissent.
   # Sans ça, un module ajouté à la target App n'est pas visible par ce pod -> adapter inerte.
   s.pod_target_xcconfig = {
-    'FRAMEWORK_SEARCH_PATHS' => '$(inherited) "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)"'
+    'FRAMEWORK_SEARCH_PATHS' => [
+      '$(inherited)',
+      # Star (SPM) et frameworks/SPM déposés à la racine des produits de build :
+      '"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)"',
+      # Brother (pod livrant un xcframework -> CocoaPods le traite ici) :
+      '"$(PODS_XCFRAMEWORKS_BUILD_DIR)/BRLMPrinterKit"'
+    ].join(' ')
   }
 
   # ---- SDK fabricants iOS ----

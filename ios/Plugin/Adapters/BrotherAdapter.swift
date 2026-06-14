@@ -39,7 +39,7 @@ final class BrotherAdapter: PrinterAdapter {
             let info = channel.channelInfo
             onFound(DiscoveredPrinter(
                 id: "brother:\(info)",
-                name: channel.extraInfo?[BRLMChannelExtraInfoKey.modelName] as? String ?? "Brother",
+                name: (channel.extraInfo?[BRLMChannelExtraInfoKeyModelName] as? String) ?? "Brother",
                 brand: "Brother",
                 transport: .wifi,
                 adapter: .brother,
@@ -84,7 +84,7 @@ final class BrotherAdapter: PrinterAdapter {
         let settings = try Self.printSettings(for: profile)
         for _ in 0..<max(1, options.copies) {
             let err = driver.printImage(with: cg, settings: settings)
-            if err.code != .noError {
+            if err.code != BRLMPrintErrorCode.noError {
                 throw PrinterError(.PRINT_FAILED, "Impression Brother échouée", detail: "\(err.code.rawValue)", retryable: true)
             }
         }
@@ -117,23 +117,33 @@ final class BrotherAdapter: PrinterAdapter {
         }
     }
 
-    /// Réglages d'impression selon la famille du modèle (QL/PJ/RJ/TD/PT).
+    /// Réglages d'impression selon le modèle. Brother exige des `*PrintSettings`
+    /// spécifiques à la famille (QL/RJ/PJ…) construits avec un `BRLMPrinterModel`
+    /// précis. On mappe les modèles courants ; modèle non listé -> erreur explicite
+    /// (l'ajouter ici si besoin). Best-effort, à valider sur device.
     private static func printSettings(for profile: PrinterProfile) throws -> BRLMPrintSettingsProtocol {
         guard let model = profile.model else {
-            throw PrinterError(.UNSUPPORTED_PRINTER, "Modèle Brother requis (ex 'RJ-3150')")
+            throw PrinterError(.UNSUPPORTED_PRINTER, "Modèle Brother requis (ex 'RJ-2150')")
         }
-        let m = model.uppercased()
-        // Roll/receipt: RJ / TD ; labels: QL ; mobiles: PJ
-        if m.hasPrefix("RJ") || m.hasPrefix("TD") || m.hasPrefix("PJ") || m.hasPrefix("QL") || m.hasPrefix("PT") {
-            // BRLMPrintSettings générique convient pour l'impression image roll.
-            if let s = BRLMPrintSettings(printerModel: brlmModel(from: m)) { return s }
-        }
-        throw PrinterError(.UNSUPPORTED_PRINTER, "Famille Brother inconnue pour '\(model)'")
-    }
+        let m = model.uppercased().replacingOccurrences(of: "[^A-Z0-9]", with: "", options: .regularExpression)
 
-    private static func brlmModel(from m: String) -> BRLMPrinterModel {
-        // Best effort : laisser .other si le mapping précis n'est pas connu.
-        return .other
+        let ql: [String: BRLMPrinterModel] = [
+            "QL710W": .QL_710W, "QL720NW": .QL_720NW, "QL810W": .QL_810W,
+            "QL820NWB": .QL_820NWB, "QL1110NWB": .QL_1110NWB, "QL1115NWB": .QL_1115NWB,
+        ]
+        if let pm = ql[m], let s = BRLMQLPrintSettings(defaultPrintSettingsWith: pm) { return s }
+
+        let rj: [String: BRLMPrinterModel] = [
+            "RJ2050": .RJ_2050, "RJ2140": .RJ_2140, "RJ2150": .RJ_2150, "RJ3050": .RJ_3050,
+        ]
+        if let pm = rj[m], let s = BRLMRJPrintSettings(defaultPrintSettingsWith: pm) { return s }
+
+        let pj: [String: BRLMPrinterModel] = [
+            "PJ673": .PJ_673, "PJ763MFI": .pj_763MFi, "PJ773": .PJ_773, "PJ822": .PJ_822, "PJ823": .PJ_823,
+        ]
+        if let pm = pj[m], let s = BRLMPJPrintSettings(defaultPrintSettingsWith: pm) { return s }
+
+        throw PrinterError(.UNSUPPORTED_PRINTER, "Modèle Brother non mappé: '\(model)' — l'ajouter dans BrotherAdapter.printSettings")
     }
     #endif
 }
