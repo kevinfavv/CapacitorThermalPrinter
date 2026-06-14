@@ -69,16 +69,18 @@ The Star dependency ships with the plugin and Gradle pulls it from Maven Central
 ### iOS (one manual step: add the SPM package)
 The Star iOS SDK is distributed via **Swift Package Manager** (there is no official pod).
 Follow the official StarXpand steps, in your Xcode app project:
-1. Select your **project** in the navigator, then **File ▸ Add Packages…**
+1. Select your **project** in the navigator, then **File ▸ Add Package Dependencies…**
+   (older Xcode labels it **Add Packages…**). This is the item near the top of the File menu —
+   *not* the **File ▸ Packages ▸** submenu (Reset/Resolve only).
 2. Paste `https://github.com/star-micronics/StarXpand-SDK-iOS` into the **search field at the
-   top-right** of the window.
+   top-right** of the window, and wait for it to resolve.
 3. Select **`StarXpand-SDK-iOS`** and press **Add Package**, then add the **`StarIO10`**
    product to your app target.
 
 > ⚠️ If Xcode answers `Received invalid response… make sure it is a package collection URL`,
-> you pasted the URL into the wrong place. Use **Add Packages…** (not "Add Package
-> Collection") and put the URL in the top-right search field. If it persists, sign in to
-> GitHub under **Xcode ▸ Settings ▸ Accounts**, or try the `…StarXpand-SDK-iOS.git` form.
+> the URL went into the wrong place — make sure you used **Add Package Dependencies…** and
+> pasted it into the top-right search field. If it persists, sign in to GitHub under
+> **Xcode ▸ Settings ▸ Accounts**, or try the `…StarXpand-SDK-iOS.git` form.
 
 The `StarAdapter.swift` adapter activates via `#if canImport(StarIO10)`.
 > ⚠️ If the module isn't visible from the plugin's target (Pod), also link `StarIO10` to the
