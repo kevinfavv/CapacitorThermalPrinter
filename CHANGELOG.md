@@ -24,6 +24,24 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/) et
   XCTest (iOS) des encodeurs ; seuils de couverture appliqués en CI.
 - `ROADMAP.md`.
 
+## [7.0.3] - 2026-06-14
+
+### Ajouté
+- **Zebra Link-OS (iOS)** : pont Objective-C runtime (`ZebraBridge`) qui pilote le SDK via
+  `NSClassFromString`. Le plugin compile sans le SDK et active Zebra dès que
+  `ZSDK_API.xcframework` est présent ; le podspec ajoute automatiquement `-ObjC`,
+  `ExternalAccessory` et `CoreBluetooth` (requis par la lib statique Zebra).
+- **Star (iOS)** : `FRAMEWORK_SEARCH_PATHS` dans le podspec pour que l'adapter voie le
+  package SPM `StarIO10` ajouté à la target App — activation automatique, sans hook Podfile.
+
+### Modifié
+- **Brother (iOS)** : meilleure prise en charge des modèles d'imprimante.
+- **Epson (iOS)** : cohérence des types de données dans l'adapter.
+- **Documentation SDK** (`docs/SDK_INTEGRATION.md`) entièrement revue : guide d'installation
+  par marque, en anglais et orienté développeur intégrateur (GIFs Star/Epson/Zebra, liens de
+  téléchargement, signature des frameworks). Les détails techniques internes ont été déplacés
+  dans `CONTRIBUTING.md`.
+
 ## [0.1.0] - Non publié
 
 ### Ajouté
