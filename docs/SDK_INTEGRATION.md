@@ -77,6 +77,8 @@ Follow the official StarXpand steps, in your Xcode app project:
 3. Select **`StarXpand-SDK-iOS`** and press **Add Package**, then add the **`StarIO10`**
    product to your app target.
 
+![Adding the Star iOS package via Swift Package Manager](add_star_ios.gif)
+
 > ⚠️ If Xcode answers `Received invalid response… make sure it is a package collection URL`,
 > the URL went into the wrong place — make sure you used **Add Package Dependencies…** and
 > pasted it into the top-right search field. If it persists, sign in to GitHub under
