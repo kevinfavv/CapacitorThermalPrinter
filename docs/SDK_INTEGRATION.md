@@ -146,8 +146,8 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
 4. `EpsonAdapter.kt` (reflection) activates automatically.
 
 ### iOS
-1. Download the **ePOS SDK for iOS** from [Epson Developers](https://epson.com/developers-products)
-   (Bluetooth MFi: see [MFi / ePOS SDK support](https://global.epson.com/products_and_drivers/tm/en/mfi.html)).
+1. Download the **ePOS SDK for iOS** — [direct download (Epson Download Center)](https://download-center.epson.com/download/?module_id=e5fde6cb-2f38-4bb3-b920-e53ee5b3190f%3A2.37.0&device_id=TM-m10&os=IOS&region=FR&language=fr)
+   (or browse from [Epson Developers](https://epson.com/developers-products); Bluetooth MFi: see [MFi / ePOS SDK support](https://global.epson.com/products_and_drivers/tm/en/mfi.html)).
 2. Drag `libepos2.xcframework` (plus `libeposeasyselect.xcframework` if provided) into your
    Xcode project (app target, *Embed & Sign*).
 3. `EpsonAdapter.swift` activates via `#if canImport(libepos2)`.
