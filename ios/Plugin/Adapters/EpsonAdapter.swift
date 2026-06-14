@@ -74,12 +74,12 @@ final class EpsonAdapter: PrinterAdapter {
             printer.beginTransaction()
             printer.add(image, x: 0, y: 0,
                         width: Int(image.size.width), height: Int(image.size.height),
-                        color: Int(EPOS2_COLOR_1.rawValue), mode: Int(EPOS2_MODE_MONO.rawValue),
+                        color: EPOS2_COLOR_1.rawValue, mode: EPOS2_MODE_MONO.rawValue,
                         halftone: Self.halftone(options.dithering), brightness: 1.0,
-                        compress: Int(EPOS2_COMPRESS_AUTO.rawValue))
-            if options.cut && profile.capabilities.supportsCut { printer.addCut(Int(EPOS2_CUT_FEED.rawValue)) }
+                        compress: EPOS2_COMPRESS_AUTO.rawValue)
+            if options.cut && profile.capabilities.supportsCut { printer.addCut(EPOS2_CUT_FEED.rawValue) }
             if options.openCashDrawer && profile.capabilities.supportsCashDrawer {
-                printer.addPulse(Int(EPOS2_DRAWER_2PIN.rawValue), time: Int(EPOS2_PULSE_100.rawValue))
+                printer.addPulse(EPOS2_DRAWER_2PIN.rawValue, time: EPOS2_PULSE_100.rawValue)
             }
             let result = printer.sendData(Int(EPOS2_PARAM_DEFAULT))
             printer.endTransaction()
@@ -120,11 +120,11 @@ final class EpsonAdapter: PrinterAdapter {
         return EPOS2_TM_M30.rawValue
     }
 
-    private static func halftone(_ dithering: String) -> Int {
+    private static func halftone(_ dithering: String) -> Int32 {
         switch dithering {
-        case "none": return Int(EPOS2_HALFTONE_THRESHOLD.rawValue)
-        case "atkinson", "floyd_steinberg": return Int(EPOS2_HALFTONE_ERROR_DIFFUSION.rawValue)
-        default: return Int(EPOS2_HALFTONE_DITHER.rawValue)
+        case "none": return EPOS2_HALFTONE_THRESHOLD.rawValue
+        case "atkinson", "floyd_steinberg": return EPOS2_HALFTONE_ERROR_DIFFUSION.rawValue
+        default: return EPOS2_HALFTONE_DITHER.rawValue
         }
     }
     #endif
