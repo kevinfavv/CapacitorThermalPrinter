@@ -155,7 +155,9 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
    > `libepos2` (an alternative, not a complement). Since the Capacitor Podfile uses
    > `use_frameworks!`, use the dynamic `libepos2.xcframework`; adding both causes duplicate
    > symbols.
-3. `EpsonAdapter.swift` activates via `#if canImport(libepos2)`.
+3. That's all on the app side: once `libepos2.xcframework` is on the `App` target, the plugin
+   pod sees it (see [How activation works](#how-activation-works-technical-summary)) and
+   `EpsonAdapter.swift` activates **automatically** via `#if canImport(libepos2)`.
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
    > `EpsonAdapter.swift` (the two lines `canImport(libepos2)` and `import libepos2`).
 
@@ -188,8 +190,12 @@ then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
 1. Download the **Link-OS Multiplatform SDK** (iOS) from the
    [Zebra portal](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk)
    ([downloads & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)).
-2. Drag `ZSDK_API.xcframework` into your Xcode project (*Embed & Sign*).
-3. `ZebraAdapter.swift` activates via `#if canImport(ZSDK_API)` (adjust the module name if needed).
+2. Add `ZSDK_API.xcframework` to the **`App`** target (*Embed & Sign*) — same procedure as
+   Epson above (use the **+** button under *Frameworks, Libraries, and Embedded Content*, or
+   drag it in). Zebra ships a single framework, so there's no static/dynamic choice.
+3. Once it's on the `App` target, the plugin pod sees it (see
+   [How activation works](#how-activation-works-technical-summary)) and `ZebraAdapter.swift`
+   activates **automatically** via `#if canImport(ZSDK_API)` (adjust the module name if needed).
 
 `ZebraAdapter.kt` (reflection) activates automatically when the `.jar` is present.
 
@@ -204,6 +210,11 @@ then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
 - **iOS**: each SDK adapter uses **conditional compilation** `#if canImport(Module)`. If the
   module isn't linked, the typed body is replaced by an inert stub → the plugin compiles
   without the SDK, with no risk of breakage.
+- **iOS — you only add the SDK to the `App` target.** The adapters are compiled inside the
+  `DelicityCapacitorThermalPrinter` pod, but the **podspec already sets `FRAMEWORK_SEARCH_PATHS`**
+  so the pod sees whatever the app adds (Star SPM, Brother pod, Epson/Zebra xcframeworks).
+  Adding the SDK to `App` is therefore enough — `#if canImport(...)` becomes true and the
+  adapter activates **automatically**. No Podfile `post_install` or manual pod linking needed.
 
 > ⚠️ **The reflective code (Android) and the gated iOS code are not checked by the plugin
 > repo's compiler** (the binaries aren't present). They are written against the SDKs'
