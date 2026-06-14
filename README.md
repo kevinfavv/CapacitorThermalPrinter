@@ -190,16 +190,10 @@ and each brand **activates automatically** as soon as its binary is present.
 | **Epson** | ⛔ manual `.jar`+`.so` | ⛔ manual xcframework | Drop `ePOS2.jar` (Android) / `libepos2.xcframework` (iOS). |
 | **Zebra** | ⚠️ private Maven (token) or `.jar` | ⛔ manual xcframework | Zebra token or `ZSDK_ANDROID_API.jar`; `ZSDK_API.xcframework` (iOS). |
 
-**Official download links:**
-- **Star**: [StarXpand-SDK-Android](https://github.com/star-micronics/StarXpand-SDK-Android) · [StarXpand-SDK-iOS](https://github.com/star-micronics/StarXpand-SDK-iOS) (nothing to download: Maven Central / SPM)
-- **Epson**: [Epson Developers](https://epson.com/developers-products) · [MFi / ePOS SDK](https://global.epson.com/products_and_drivers/tm/en/mfi.html)
-- **Brother**: [Mobile SDK (download)](https://support.brother.com/g/s/es/dev/en/mobilesdk/download/index.html) · US: [Brother Developer Program](https://developerprogram.brother-usa.com/sdk-download) · iOS pod: [BRLMPrinterKit](https://cocoapods.org/pods/BRLMPrinterKit)
-- **Zebra**: [Link-OS Multiplatform SDK](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk) · [Downloads & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)
-
-> Epson / Brother / Zebra: a free developer account + license acceptance are required.
-
-Step-by-step setup (where to drop each binary, Zebra private Maven repo, iOS module
-names, git-ignored test folder): **[`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md)**.
+**➡️ Full installation guide: [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).**
+It covers everything per brand — official download links, where to drop each binary,
+the Star SPM package, CocoaPods/Podfile setup, the Zebra private Maven repo, iOS
+module names, and the git-ignored test folder.
 
 ### Tested on real hardware
 
