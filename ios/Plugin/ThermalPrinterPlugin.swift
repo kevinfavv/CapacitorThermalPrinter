@@ -101,8 +101,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         let force = call.getString("forceAdapter").map { AdapterId.from($0) }
         let setAsDefault = call.getBool("setAsDefault") ?? false
         Task { await self.guarded(call) {
-            let connected = try await self.engine.connect(printerId, timeoutMs: timeout, forceAdapter: force, setAsDefault: setAsDefault)
-            call.resolve(["connected": connected])
+            let result = try await self.engine.connect(printerId, timeoutMs: timeout, forceAdapter: force, setAsDefault: setAsDefault)
+            call.resolve(["connected": result.connected, "paper": result.paper?.toDict() ?? NSNull()])
         } }
     }
 

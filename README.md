@@ -6,13 +6,18 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
 
 **Requires Capacitor 7** · Android (`compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
 
+> 🚧 **Work in progress.** This plugin is under active development and **not yet
+> validated on real hardware** (see [Tested on real hardware](#tested-on-real-hardware)).
+> APIs may still change. **Contributions are very welcome** — bug reports, hardware
+> test feedback, and PRs. See [`CONTRIBUTING.md`](CONTRIBUTING.md).
+
 ---
 
 ## Contents
 
 1. [Philosophy](#philosophy)
-2. [Architecture](#architecture)
-3. [Installation](#installation)
+2. [Installation](#installation)
+3. [Usage patterns](#usage-patterns)
 4. [Manufacturer SDKs](#manufacturer-sdks)
 5. [Permissions](#permissions)
 6. [Public API](#public-api)
@@ -35,35 +40,7 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
 - **One JS API.** Internally, an **adapter-based architecture** routes to the right implementation.
 - **There is no universal protocol**: each family has its adapter. Adapter priority guarantees the best choice.
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     App (Ionic/JS/TS)                          │
-│   discoverPrinters / connect / setDefault / printImage ...     │
-└───────────────────────────────┬───────────────────────────────┘
-                                 │  Single API (definitions.ts)
-                 ┌───────────────┴───────────────┐
-                 │      Capacitor Bridge          │
-        ┌────────┴─────────┐           ┌──────────┴─────────┐
-        │  Android (Kotlin) │           │    iOS (Swift)     │
-        │  ThermalPrinter…  │           │  ThermalPrinter…   │
-        └────────┬─────────┘           └──────────┬─────────┘
-                 │ ThermalPrinterEngine            │ ThermalPrinterEngine
-   ┌─────────────┼──────────────┐      ┌───────────┼──────────────┐
-   │  Discovery  │   Adapters    │      │ Discovery │   Adapters    │
-   │  Manager    │  (registry)   │      │  Manager  │  (registry)   │
-   └─────────────┴──────────────┘      └───────────┴──────────────┘
-           │                                    │
-   ┌───────┴────────────────────────────────────┴─────────┐
-   │ EscPos · Epson · Star · Brother · Zebra · RawTcp · BLE │
-   │ Transport: TCP9100 / SPP(Android) / NWConnection(iOS)  │
-   │ Image: decode → resize → grayscale → dither → raster   │
-   │ Store: profiles + default printer (persisted)          │
-   └────────────────────────────────────────────────────────┘
-```
-
-> 📁 Repo layout, internal architecture, tests and the contribution guide live in
+> 📁 Internal architecture, repo layout, tests and the contribution guide live in
 > [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## Installation
@@ -118,6 +95,7 @@ import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
 
 await ThermalPrinter.requestPermissions();
 const { printers } = await ThermalPrinter.discoverPrinters({ timeoutMs: 8000 });
+// printImage auto-connects on demand (autoReconnect defaults to true) — no connectPrinter needed.
 await ThermalPrinter.printImage({
   printerId: printers[0].id,
   image: { filePath: '/data/.../receipt.png' },
@@ -126,6 +104,71 @@ await ThermalPrinter.printImage({
 
 ✅ **Works out of the box** for **Wi-Fi/Ethernet ESC/POS** printers — no SDK required.
 For Bluetooth/USB/BLE and brand SDKs, see the sections below.
+
+## Usage patterns
+
+Pick the pattern that fits your UX. **You don't have to call `connectPrinter` to print** —
+`printImage` / `printText` connect on demand (`autoReconnect: true` by default).
+
+### A. One-shot — simplest
+
+Discover, then print by `printerId`. The print call connects automatically.
+
+```ts
+const { printers } = await ThermalPrinter.discoverPrinters({ timeoutMs: 8000 });
+await ThermalPrinter.printImage({ printerId: printers[0].id, image: { filePath } });
+// → resolves the printer (from the latest discovery) + connects + prints
+```
+
+### B. Default printer — recommended for repeated use
+
+**Once** (setup): let the user pick a printer, then connect & persist it as default
+**only if the connection succeeds**. **Afterwards** (even after an app restart): print
+without a `printerId` — the default profile is used and reconnected automatically.
+
+```ts
+// Setup (once), e.g. after a successful test print:
+const { connected } = await ThermalPrinter.connectPrinter({ printerId, setAsDefault: true });
+
+// Daily use — no printerId, no connect:
+await ThermalPrinter.printImage({ image: { filePath } });        // uses default + auto-reconnect
+await ThermalPrinter.printText({ items });                       // same
+```
+
+### C. Explicit connect — to test, read paper size, or show status
+
+Use `connectPrinter` when you need a result **before** printing: a connection test,
+the **paper size**, or a status badge.
+
+```ts
+const { connected, paper } = await ThermalPrinter.connectPrinter({ printerId });
+if (!connected) return showError('Unreachable');
+showLabel(paper?.widthMm ? `${paper.widthMm} mm` : 'Unknown width');
+const status = await ThermalPrinter.getPrinterStatus({ printerId }); // paper/cover/online
+await ThermalPrinter.printImage({ printerId, image: { filePath } });
+```
+
+### D. Manual connection management — `autoReconnect: false`
+
+Opt out of on-demand connection (you manage `connectPrinter` / `disconnectPrinter`
+yourself). Printing while disconnected then rejects with `CONNECTION_FAILED`.
+
+```ts
+await ThermalPrinter.connectPrinter({ printerId });
+await ThermalPrinter.printImage({ printerId, image: { filePath }, autoReconnect: false });
+await ThermalPrinter.disconnectPrinter({ printerId });
+```
+
+### Good to know
+
+- **Resolution**: a `printerId` must be resolvable — either freshly discovered (this
+  session) or a saved profile. Without `printerId`, the **default printer** is used.
+- **Connection lifecycle**: connections are opened **just-in-time** before printing,
+  not held open permanently. Reconnection uses exponential backoff (3 attempts).
+- **`connectPrinter` is optional** — needed only to test, set the default, or read the
+  paper size. See [Default printer & reconnection](#default-printer--reconnection).
+- **Profiles**: `getSavedPrinters` / `getDefaultPrinter` / `setDefaultPrinter` /
+  `removePrinter` manage persisted printers.
 
 ## Manufacturer SDKs
 
@@ -157,6 +200,20 @@ and each brand **activates automatically** as soon as its binary is present.
 
 Step-by-step setup (where to drop each binary, Zebra private Maven repo, iOS module
 names, git-ignored test folder): **[`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md)**.
+
+### Tested on real hardware
+
+> ⚠️ **No brand has been validated on physical hardware yet.** The native SDK code is
+> implemented but **not yet verified on-device** (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
+> **Epson** and **Star** are the first brands planned for on-device testing.
+
+| Brand | On-device tested |
+|---|---|
+| **Star** | ⏳ planned |
+| **Epson** | ⏳ planned |
+| **Brother** | ❌ not yet |
+| **Zebra** | ❌ not yet |
+| Generic ESC/POS (Wi-Fi / Bluetooth / USB) | ❌ not yet |
 
 ### Know which SDKs are active (runtime)
 
@@ -222,7 +279,7 @@ Call `requestPermissions()` before the first scan.
 import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
 
 ThermalPrinter.discoverPrinters(options?)   // → { printers: DiscoveredPrinter[] }
-ThermalPrinter.connectPrinter({ printerId, timeoutMs?, forceAdapter?, setAsDefault? })  // → { connected }
+ThermalPrinter.connectPrinter({ printerId, timeoutMs?, forceAdapter?, setAsDefault? })  // → { connected, paper: PaperInfo | null }
 ThermalPrinter.disconnectPrinter({ printerId })                          // → void
 ThermalPrinter.setDefaultPrinter({ printerId })                          // → { profile }
 ThermalPrinter.getDefaultPrinter()                                       // → { profile | null }
@@ -247,6 +304,16 @@ ThermalPrinter.addListener('printJobStatus', e => ...)      // JobState: pending
 > **`connectPrinter({ setAsDefault: true })`** sets the default printer **only if
 > the connection succeeds** (`connect` + `setDefaultPrinter` in one step, without
 > persisting an unreachable printer).
+
+> **Paper size on connect.** `connectPrinter` also returns `paper` — the paper size
+> deduced from the printer's model (**best-effort**), or **`null`** when it can't be
+> determined (typical for generic ESC/POS). The printer hardware does not report
+> remaining/printed length; only the width is derivable. Example:
+> ```ts
+> const { connected, paper } = await ThermalPrinter.connectPrinter({ printerId });
+> // paper?.widthMm → 80 | 58 | … | null
+> if (paper?.widthMm) showLabel(`${paper.widthMm} mm`); else showLabel('Unknown width');
+> ```
 
 ### Print completion / `await`
 
@@ -379,6 +446,14 @@ interface SdkStatus {
   available: boolean;       // detected & usable right now
   requiresSdk: boolean;     // true for brand SDKs, false for built-in adapters
   transports: PrinterTransport[];
+}
+
+// ---- Paper size (returned by connectPrinter, best-effort) ----
+interface PaperInfo {
+  widthMm: number | null;        // 58 | 80 | 112 … (null if unknown)
+  printableDots: number | null;  // 384 | 576 | 832 … @203 dpi (null if unknown)
+  dpi: number | null;            // 203 when width is known
+  source: 'model' | 'sdk' | 'profile';
 }
 
 // ---- Events ----

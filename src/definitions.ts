@@ -7,6 +7,7 @@ import type {
   PrintTextOptions,
 } from './core/options';
 import type { PrinterAdapterId, PrinterTransport } from './core/enums';
+import type { PaperInfo } from './core/paper';
 import type {
   DiscoveredPrinter,
   PrinterProfile,
@@ -90,8 +91,12 @@ export interface ThermalPrinterPlugin {
    */
   discoverPrinters(options?: DiscoverOptions): Promise<{ printers: DiscoveredPrinter[] }>;
 
-  /** Ouvre explicitement une connexion vers une imprimante connue/découverte. */
-  connectPrinter(options: ConnectOptions): Promise<{ connected: boolean }>;
+  /**
+   * Ouvre explicitement une connexion vers une imprimante connue/découverte.
+   * Renvoie aussi la **taille de papier** déduite du modèle (best-effort), ou
+   * `paper: null` si elle n'a pas pu être déterminée (à afficher à l'utilisateur).
+   */
+  connectPrinter(options: ConnectOptions): Promise<{ connected: boolean; paper: PaperInfo | null }>;
 
   /** Ferme la connexion active (sans supprimer le profil). */
   disconnectPrinter(options: { printerId: string }): Promise<void>;

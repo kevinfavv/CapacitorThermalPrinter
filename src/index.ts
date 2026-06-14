@@ -16,6 +16,7 @@ export * from './definitions';
 export * from './core/enums';
 export * from './core/models';
 export * from './core/options';
+export * from './core/paper';
 export * from './core/text';
 export * from './core/errors';
 export { ThermalPrinter };

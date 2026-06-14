@@ -147,8 +147,10 @@ class ThermalPrinterPlugin : Plugin() {
         val timeout = (call.getInt("timeoutMs")?.toLong()) ?: 10000L
         val force = call.getString("forceAdapter")?.let { com.delicity.thermalprinter.model.AdapterId.from(it) }
         val setAsDefault = call.getBoolean("setAsDefault", false) ?: false
-        val connected = engine.connect(printerId, timeout, force, setAsDefault)
-        JSObject().put("connected", connected)
+        val result = engine.connect(printerId, timeout, force, setAsDefault)
+        JSObject()
+            .put("connected", result.connected)
+            .put("paper", result.paper?.toJson() ?: JSObject.NULL)
     }
 
     @PluginMethod

@@ -46,7 +46,35 @@ capacitor-thermal-printer/
     └── TESTING_SDK.md                    # SDK connection test strategy
 ```
 
-## Architecture (in short)
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     App (Ionic/JS/TS)                          │
+│   discoverPrinters / connect / setDefault / printImage ...     │
+└───────────────────────────────┬───────────────────────────────┘
+                                 │  Single API (definitions.ts)
+                 ┌───────────────┴───────────────┐
+                 │      Capacitor Bridge          │
+        ┌────────┴─────────┐           ┌──────────┴─────────┐
+        │  Android (Kotlin) │           │    iOS (Swift)     │
+        │  ThermalPrinter…  │           │  ThermalPrinter…   │
+        └────────┬─────────┘           └──────────┬─────────┘
+                 │ ThermalPrinterEngine            │ ThermalPrinterEngine
+   ┌─────────────┼──────────────┐      ┌───────────┼──────────────┐
+   │  Discovery  │   Adapters    │      │ Discovery │   Adapters    │
+   │  Manager    │  (registry)   │      │  Manager  │  (registry)   │
+   └─────────────┴──────────────┘      └───────────┴──────────────┘
+           │                                    │
+   ┌───────┴────────────────────────────────────┴─────────┐
+   │ EscPos · Epson · Star · Brother · Zebra · RawTcp · BLE │
+   │ Transport: TCP9100 / SPP(Android) / NWConnection(iOS)  │
+   │ Image: decode → resize → grayscale → dither → raster   │
+   │ Store: profiles + default printer (persisted)          │
+   └────────────────────────────────────────────────────────┘
+```
+
+In short:
 
 - One JS API (`definitions.ts`) → Capacitor bridge → `ThermalPrinterEngine`
   (Kotlin/Swift) → an **adapter registry** + a **discovery manager**.

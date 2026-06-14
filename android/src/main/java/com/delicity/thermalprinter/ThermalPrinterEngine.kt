@@ -137,7 +137,10 @@ class ThermalPrinterEngine(private val context: Context) {
     // Connexion / reconnexion
     // -------------------------------------------------------------------------
 
-    suspend fun connect(printerId: String, timeoutMs: Long, forceAdapter: AdapterId?, setAsDefault: Boolean = false): Boolean {
+    /** Résultat de connexion : état + taille papier déduite (best-effort, null si inconnue). */
+    data class ConnectResult(val connected: Boolean, val paper: com.delicity.thermalprinter.model.PaperInfo?)
+
+    suspend fun connect(printerId: String, timeoutMs: Long, forceAdapter: AdapterId?, setAsDefault: Boolean = false): ConnectResult {
         val profile = resolveProfile(printerId, forceAdapter)
         val adapter = adapterFor(profile)
             ?: throw PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Aucun adapter pour ${profile.adapter.value}")
@@ -154,7 +157,13 @@ class ThermalPrinterEngine(private val context: Context) {
             store.setDefault(printerId)
             Logger.log("connect", "set-default-after-connect", mapOf("id" to printerId))
         }
-        return connected
+        // Taille papier best-effort (déduite du modèle remonté), null si inconnue.
+        val paper = if (connected) {
+            com.delicity.thermalprinter.model.PaperSizeGuess.fromBrandModel(profile.brand, profile.model)
+        } else {
+            null
+        }
+        return ConnectResult(connected, paper)
     }
 
     suspend fun disconnect(printerId: String) {

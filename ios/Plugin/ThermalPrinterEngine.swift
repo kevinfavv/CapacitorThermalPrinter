@@ -51,7 +51,10 @@ final class ThermalPrinterEngine {
 
     // MARK: Connexion
 
-    func connect(_ printerId: String, timeoutMs: Int, forceAdapter: AdapterId?, setAsDefault: Bool = false) async throws -> Bool {
+    /// Résultat de connexion : état + taille papier déduite (best-effort, nil si inconnue).
+    struct ConnectResult { let connected: Bool; let paper: PaperInfo? }
+
+    func connect(_ printerId: String, timeoutMs: Int, forceAdapter: AdapterId?, setAsDefault: Bool = false) async throws -> ConnectResult {
         let profile = try resolveProfile(printerId, forceAdapter: forceAdapter)
         guard let adapter = adapterFor(profile.adapter) else {
             throw PrinterError(.UNSUPPORTED_PRINTER, "Aucun adapter pour \(profile.adapter.rawValue)")
@@ -67,7 +70,9 @@ final class ThermalPrinterEngine {
             store.setDefault(printerId)
             Logger.shared.log("connect", "set-default-after-connect", ["id": printerId])
         }
-        return connected
+        // Taille papier best-effort (déduite du modèle remonté), nil si inconnue.
+        let paper = connected ? PaperSizeGuess.fromBrandModel(profile.brand, profile.model) : nil
+        return ConnectResult(connected: connected, paper: paper)
     }
 
     func disconnect(_ printerId: String) async {

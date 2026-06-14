@@ -37,7 +37,7 @@ export class ThermalPrinterWeb extends WebPlugin implements ThermalPrinterPlugin
     return { printers: [] };
   }
 
-  async connectPrinter(_options: ConnectOptions): Promise<{ connected: boolean }> {
+  async connectPrinter(_options: ConnectOptions): Promise<{ connected: boolean; paper: import('./core/paper').PaperInfo | null }> {
     throw this.unsupported('connectPrinter');
   }
 
