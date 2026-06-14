@@ -159,6 +159,8 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
    > `EpsonAdapter.swift` (the two lines `canImport(libepos2)` and `import libepos2`).
 
+![Adding the Epson iOS xcframework in Xcode](epson_sdk.gif)
+
 ---
 
 ## 🟨 Zebra (Link-OS — ZPL/CPCL, never ESC/POS)
