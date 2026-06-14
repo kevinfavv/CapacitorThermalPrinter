@@ -18,5 +18,6 @@ CAP_PLUGIN(ThermalPrinterPlugin, "ThermalPrinter",
     CAP_PLUGIN_METHOD(checkPermissions, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(startStatusMonitor, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(stopStatusMonitor, CAPPluginReturnPromise);
+    CAP_PLUGIN_METHOD(getActiveSdks, CAPPluginReturnPromise);
     CAP_PLUGIN_METHOD(getDebugLog, CAPPluginReturnPromise);
 )

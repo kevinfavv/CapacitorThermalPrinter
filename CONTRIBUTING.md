@@ -104,7 +104,7 @@ library depends on `:capacitor-android`):
 ./gradlew testDebugUnitTest jacocoTestReport
 #   → android/build/reports/jacoco/jacocoTestReport/html/index.html
 # iOS
-xcodebuild test -scheme DelicityThermalPrinter -enableCodeCoverage YES
+xcodebuild test -scheme DelicityCapacitorThermalPrinter -enableCodeCoverage YES
 ```
 
 ## Tests & quality

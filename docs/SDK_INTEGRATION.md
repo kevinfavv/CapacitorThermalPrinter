@@ -79,7 +79,7 @@ Dans l'app Xcode consommatrice :
 
 L'adapter `StarAdapter.swift` s'active via `#if canImport(StarIO10)`.
 > ⚠️ Si le module n'est pas visible depuis la target du plugin (Pod), lier
-> aussi `StarIO10` au pod `DelicityThermalPrinter` dans le Podfile post-install.
+> aussi `StarIO10` au pod `DelicityCapacitorThermalPrinter` dans le Podfile post-install.
 
 ---
 

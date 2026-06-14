@@ -1,5 +1,5 @@
 import XCTest
-@testable import DelicityThermalPrinter
+@testable import DelicityCapacitorThermalPrinter
 
 /// Tests unitaires de l'encodeur ESC/POS texte iOS (miroir des tests TS/Kotlin).
 /// À exécuter via le scheme de test du package (xcodebuild test).

@@ -50,7 +50,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
     // apparaît à la première connexion. Le BLE déclenche une autorisation gérée par
     // CoreBluetooth si on instancie un CBCentralManager (à activer avec BleAdapter).
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc override public func checkPermissions(_ call: CAPPluginCall) {
         call.resolve(permissionStatus())
     }
 
