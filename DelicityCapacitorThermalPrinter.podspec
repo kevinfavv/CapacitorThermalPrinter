@@ -15,6 +15,12 @@ Pod::Spec.new do |s|
   s.dependency 'Capacitor'
   s.swift_version = '5.1'
 
+  # Frameworks système requis par le SDK Zebra Link-OS (lib statique). `-ObjC` (voir plus
+  # bas) force le chargement de ses .o, dont MfiBtPrinterConnection qui utilise
+  # ExternalAccessory (Bluetooth MFi). CoreBluetooth/ExternalAccessory sont des frameworks
+  # système : aucun impact pour les apps sans Zebra.
+  s.frameworks = 'ExternalAccessory', 'CoreBluetooth'
+
   # Permet aux adapters `#if canImport(...)` de voir les SDK fabricants que l'app
   # consommatrice ajoute (Star via SPM, Brother via pod, Epson/Zebra xcframework) :
   # le dossier de produits de build est l'endroit où tous ces frameworks atterrissent.
@@ -28,6 +34,15 @@ Pod::Spec.new do |s|
       '"$(PODS_XCFRAMEWORKS_BUILD_DIR)/BRLMPrinterKit"'
     ].join(' ')
   }
+
+  # Zebra : son SDK est une librairie statique ObjC pilotée au runtime
+  # (`NSClassFromString` dans ZebraBridge, aucune référence de symbole au link).
+  # Sans `-ObjC`, l'éditeur de liens écarte les .o non référencés du `.a` -> les classes
+  # Zebra seraient absentes du binaire et `NSClassFromString` renverrait nil. `-ObjC`
+  # force le chargement de toutes les classes/catégories ObjC des libs statiques (c'est
+  # aussi l'exigence officielle d'installation du Link-OS SDK). Bénin pour les apps sans
+  # Zebra. Appliqué à la target App pour que l'activation Zebra soit automatique.
+  s.user_target_xcconfig = { 'OTHER_LDFLAGS' => '-ObjC' }
 
   # ---- SDK fabricants iOS ----
   # Le plugin compile SANS aucun SDK fabricant (compilation conditionnelle

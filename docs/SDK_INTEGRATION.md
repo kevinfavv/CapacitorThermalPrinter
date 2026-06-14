@@ -153,10 +153,11 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother suppo
    support turns on by itself.
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
    > `EpsonAdapter.swift` (the two lines `canImport(libepos2)` and `import libepos2`).
-4. **Enable signing for the embedded framework(s)** — see
-   [Enable framework signing (iOS)](#enable-framework-signing-ios).
 
 ![Adding the Epson iOS xcframework in Xcode](epson_sdk.gif)
+
+4. **Enable signing for the embedded framework(s)** — see
+   [Enable framework signing (iOS)](#enable-framework-signing-ios).
 
 ---
 
@@ -181,19 +182,36 @@ Download the [Link-OS Multiplatform SDK](https://developer.zebra.com/products/pr
 drop `ZSDK_ANDROID_API.jar` (plus `ZSDK_ANDROID_BTLE.jar`) into `android/app/libs/`,
 then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
 
-### iOS (manual xcframework)
+### iOS (manual xcframework — activates automatically)
+
+> **How Zebra differs from Star/Epson/Brother.** Zebra's iOS SDK ships
+> `ZSDK_API.xcframework` as a **static library (`ZSDK_API.a`) + Objective-C headers, with
+> NO Swift/clang module** — so `#if canImport(ZSDK_API)` can never be true (unlike Star/
+> Epson/Brother, which ship importable modules). The plugin therefore drives Zebra through
+> an **Objective-C runtime bridge** (`ZebraBridge`) that looks the SDK classes up at runtime
+> with `NSClassFromString` — no module, no compile-time symbol references. Result: the
+> plugin still links fine in apps that don't add Zebra, and Zebra turns on **by itself** as
+> soon as the SDK is present.
+
 1. Download the **Link-OS Multiplatform SDK** (iOS) from the
    [Zebra portal](https://developer.zebra.com/products/printers/link-os-multiplatform-sdk)
    ([downloads & support](https://www.zebra.com/us/en/support-downloads/software/printer-software/link-os-multiplatform-sdk.html)).
 2. In Xcode, **drag and drop** `ZSDK_API.xcframework` onto the **`App` ▸ Frameworks** group,
-   and **tick "Copy items if needed"** in the dialog so it's copied into the project. Leave it
-   on **Embed & Sign**. Zebra ships a single framework, so there's no static/dynamic choice.
-3. Once it's on the `App` target, Zebra support turns on by itself. (If your SDK build uses a
-   different module name than `ZSDK_API`, adjust it in `ZebraAdapter.swift`.)
-4. **Enable signing for the embedded framework** — see
-   [Enable framework signing (iOS)](#enable-framework-signing-ios).
+   **tick "Copy items if needed"**, and make sure it appears in the `App` target's
+   **"Link Binary With Libraries"** (it's a static lib → *linked*, not embedded).
+3. Run `pod install` (or `npx cap sync ios`). The plugin's podspec then automatically:
+   - adds **`-ObjC`** to the app's `OTHER_LDFLAGS` — *required* so the linker keeps the
+     Zebra classes from the static lib (otherwise unreferenced `.o` files are dropped and
+     `NSClassFromString` returns nil). This is also Zebra's own documented requirement.
+   - links **`ExternalAccessory`** + **`CoreBluetooth`** (needed by Zebra's MFi Bluetooth
+     connection class, which `-ObjC` pulls in).
 
 ![Adding the Zebra iOS xcframework in Xcode](zebra.gif)
+
+4. That's it — no Podfile edit. `getActiveSdks()` then reports `zebra: available=true` and
+   the adapter prints via `GraphicsUtil` (CGImage → ZPL). For MFi Bluetooth, also add the
+   `com.zebra.rawport` protocol string under **Supported external accessory protocols** in
+   `Info.plist`.
 
 On Android, Zebra support turns on by itself once the `.jar` is present.
 

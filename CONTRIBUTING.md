@@ -80,9 +80,10 @@ In short:
   (Kotlin/Swift) → an **adapter registry** + a **discovery manager**.
 - The app sends an **image**; the engine normalizes it (resize → grayscale → 1-bit +
   dithering) and routes it to the right adapter (ESC/POS raster, SDK `addImage`, ZPL…).
-- Manufacturer SDKs are **optional**: Star = real dependency (typed calls); Epson/
-  Zebra/Brother = reflection on Android, `#if canImport` on iOS. See
-  [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
+- Manufacturer SDKs are **optional**: Star = real dependency (typed calls); Epson/Brother
+  = reflection on Android, `#if canImport` on iOS; **Zebra = reflection on Android, and an
+  Objective-C runtime bridge on iOS** (its SDK is a static lib with no Swift module, so
+  `canImport` can't see it). See [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
 
 ## SDK activation & detection (internals)
 
@@ -98,6 +99,13 @@ In short:
 - **iOS**: each SDK adapter uses **conditional compilation** `#if canImport(Module)`. If the
   module isn't linked, the typed body is replaced by an inert stub → the plugin compiles
   without the SDK, with no risk of breakage.
+  *Exception*: **Zebra** ships a static lib + ObjC headers with **no Swift module**, so
+  `canImport` can never see it. Its adapter goes through an **Objective-C runtime bridge**
+  (`ios/Plugin/Adapters/ZebraBridge.{h,m}`) that resolves the SDK classes with
+  `NSClassFromString` and calls them via protocol-typed `objc_msgSend` — **no compile-time
+  symbol references**, so the plugin still links in apps without Zebra. The podspec injects
+  `-ObjC` (so the linker keeps the static lib's classes) and links `ExternalAccessory` +
+  `CoreBluetooth`. `ZebraBridge.isAvailable()` (i.e. `NSClassFromString != nil`) gates it.
 - **iOS — the SDK only has to be added to the `App` target.** The adapters are compiled
   inside the `DelicityCapacitorThermalPrinter` pod, but the **podspec already sets
   `FRAMEWORK_SEARCH_PATHS`** so the pod sees whatever the app adds (Star SPM, Brother pod,
@@ -202,7 +210,8 @@ on-device validation** (native SDK code not compiled in this repo) · 🟡 parti
 | Bluetooth | **Android Bluetooth Classic** (SPP) for ESC/POS | ✅ |
 | Star SDK | auto-download (Maven/SPM), typed calls | ✅ |
 | Epson SDK | Android reflection / iOS `canImport` | ✅◷ |
-| Brother / Zebra | Android reflection / iOS `canImport` (Brother iOS via pod) | ✅◷ |
+| Brother | Android reflection / iOS `canImport` (iOS via pod) | ✅◷ |
+| Zebra | Android reflection / iOS **ObjC runtime bridge** (`ZebraBridge`, static lib + `-ObjC`) | ✅◷ |
 | iOS | Wi-Fi TCP + Star/Epson SDK; **BLE via MFi SDK** (no generic GATT exposed) | ✅ |
 | Monitoring | `start/stopStatusMonitor` + **backoff reconnection** + **hold recovery** | ✅ |
 | Android transports | **BLE GATT** (MTU, UUID allowlist) + **USB host** (bulk OUT) | ✅◷ |
