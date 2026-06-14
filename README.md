@@ -68,12 +68,64 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
 
 ## Installation
 
+> Package: **`@delicity/capacitor-thermal-printer`** · Capacitor 7 · Android (`compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
+
+### Step by step
+
+**1. Install the package**
+
 ```bash
 npm install @delicity/capacitor-thermal-printer
+```
+
+**2. Sync the native projects**
+
+```bash
 npx cap sync
 ```
 
-**Capacitor 7 requirements**: Android `compileSdk 35` / JDK 21 ; iOS 14+ / Xcode 16+.
+This adds the Android library to your Gradle project and runs `pod install` for iOS.
+
+**3. iOS — add the required keys to your app's `Info.plist`**
+
+At minimum, for Wi-Fi/network printers (see [Permissions](#permissions) for the full list):
+
+```xml
+<key>NSLocalNetworkUsageDescription</key>
+<string>Discover and print to printers on the local network.</string>
+<key>NSBonjourServices</key>
+<array>
+  <string>_pdl-datastream._tcp</string>
+  <string>_printer._tcp</string>
+</array>
+```
+
+Then re-sync: `npx cap sync ios`.
+
+**4. Android — nothing to configure** for the default path. The plugin ships its own
+manifest permissions (Bluetooth, network, USB feature). Just call
+`requestPermissions()` before scanning (needed for Bluetooth on Android 12+).
+
+**5. (Optional) Add a manufacturer SDK** — only if you use **Epson / Star / Brother /
+Zebra** via their native SDK. Generic ESC/POS (Wi-Fi/Bluetooth/USB) and Star work
+without extra setup; the others need a one-time binary drop. See
+[Manufacturer SDKs](#manufacturer-sdks) and [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
+
+**6. Use it**
+
+```ts
+import { ThermalPrinter } from '@delicity/capacitor-thermal-printer';
+
+await ThermalPrinter.requestPermissions();
+const { printers } = await ThermalPrinter.discoverPrinters({ timeoutMs: 8000 });
+await ThermalPrinter.printImage({
+  printerId: printers[0].id,
+  image: { filePath: '/data/.../receipt.png' },
+});
+```
+
+✅ **Works out of the box** for **Wi-Fi/Ethernet ESC/POS** printers — no SDK required.
+For Bluetooth/USB/BLE and brand SDKs, see the sections below.
 
 ## Manufacturer SDKs
 
