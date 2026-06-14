@@ -15,6 +15,14 @@ Pod::Spec.new do |s|
   s.dependency 'Capacitor'
   s.swift_version = '5.1'
 
+  # Permet aux adapters `#if canImport(...)` de voir les SDK fabricants que l'app
+  # consommatrice ajoute (Star via SPM, Brother via pod, Epson/Zebra xcframework) :
+  # le dossier de produits de build est l'endroit où tous ces frameworks atterrissent.
+  # Sans ça, un module ajouté à la target App n'est pas visible par ce pod -> adapter inerte.
+  s.pod_target_xcconfig = {
+    'FRAMEWORK_SEARCH_PATHS' => '$(inherited) "$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)"'
+  }
+
   # ---- SDK fabricants iOS ----
   # Le plugin compile SANS aucun SDK fabricant (compilation conditionnelle
   # `#if canImport(...)` dans les adapters). On NE déclare donc PAS ici de

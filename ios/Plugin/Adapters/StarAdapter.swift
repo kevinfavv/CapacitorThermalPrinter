@@ -54,7 +54,7 @@ final class StarAdapter: PrinterAdapter {
                 onFound: { printer in
                     let settings = printer.connectionSettings
                     let transport = Self.transport(for: settings.interfaceType)
-                    let model = printer.information?.model.map { String(describing: $0) }
+                    let model = printer.information.map { String(describing: $0.model) }
                     onFound(DiscoveredPrinter(
                         id: "star:\(settings.interfaceType):\(settings.identifier)",
                         name: model ?? "Star Printer",
@@ -259,7 +259,7 @@ final class StarAdapter: PrinterAdapter {
             _ = pb.styleAlignment(alignment(for: align))
             _ = pb.actionPrintBarcode(StarXpandCommand.Printer.BarcodeParameter(content: value, symbology: barcodeSymbology(for: symbology))
                 .setHeight(Double(min(max(height, 1), 255)))
-                .setPrintHri(hri != "none"))
+                .setPrintHRI(hri != "none"))
         case .cashDrawer, .image, .raw:
             // tiroir -> openCashDrawer ; image -> printImage ; raw -> non supporté par StarXpand.
             break

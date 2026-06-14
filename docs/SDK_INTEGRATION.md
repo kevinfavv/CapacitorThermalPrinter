@@ -79,7 +79,20 @@ Follow the official StarXpand steps, in your Xcode app project:
 
 ![Adding the Star iOS package via Swift Package Manager](add_star_ios.gif)
 
-Once this package is added, Star printing is immediately supported on iOS.
+4. Run `npx cap sync ios` (or `pod install`) and rebuild. **That's it — no Podfile edit.**
+
+> ℹ️ **Why it just works:** a Swift Package added to your *app target* is normally not
+> visible to a CocoaPods pod (which is what this plugin is). To avoid forcing you into a
+> manual Podfile hook, the plugin's **podspec already adds the build-products directory to
+> its `FRAMEWORK_SEARCH_PATHS`** (`pod_target_xcconfig`), which is where SPM drops
+> `StarIO10.framework`. So `#if canImport(StarIO10)` resolves automatically and the typed
+> Star code compiles; at runtime the symbols resolve from the StarIO10 framework your app
+> embeds via SPM. The same mechanism makes Brother (pod) / Epson / Zebra (xcframeworks)
+> visible once you add them to the app.
+
+> ✅ Verified on a Capacitor 7 app + iOS simulator: after just adding the SPM package,
+> `getActiveSdks()` reports `star: available=true` and Star discovery routes through the
+> real SDK. The adapter activates via `#if canImport(StarIO10)`.
 
 ---
 
