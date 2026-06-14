@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main, master]
+    tags: ['v*']        # déclenche aussi le job publish (ci-dessous)
   pull_request:
 
 jobs:
@@ -42,8 +43,25 @@ jobs:
         with:
           node-version: 20
           registry-url: https://registry.npmjs.org
+      # Garde-fou : la version publiée = package.json. On refuse de publier si le
+      # tag git (vX.Y.Z) ne correspond pas, pour éviter de publier une vieille version.
+      - name: Check tag matches package.json version
+        run: |
+          PKG=$(node -p "require('./package.json').version")
+          TAG="${GITHUB_REF_NAME#v}"
+          echo "package.json=$PKG · tag=$TAG"
+          if [ "$PKG" != "$TAG" ]; then
+            echo "::error::Tag v$TAG does not match package.json ($PKG)"
+            exit 1
+          fi
       - run: npm install
       - run: npm run build
+      - run: npm test
+      # `--access public` CRÉE le package au tout premier publish (package scoped
+      # inexistant) ET publie les versions suivantes. Aucune étape "create" séparée
+      # n'est nécessaire côté npm. Pré-requis unique non automatisable : le scope/org
+      # `@delicity` doit exister sur npmjs.com (ou être ton scope perso) et le token
+      # NPM_TOKEN doit avoir le droit d'y publier.
       - run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
