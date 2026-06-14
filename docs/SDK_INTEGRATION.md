@@ -153,6 +153,8 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother suppo
    support turns on by itself.
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
    > `EpsonAdapter.swift` (the two lines `canImport(libepos2)` and `import libepos2`).
+4. **Enable signing for the embedded framework(s)** — see
+   [Enable framework signing (iOS)](#enable-framework-signing-ios).
 
 ![Adding the Epson iOS xcframework in Xcode](epson_sdk.gif)
 
@@ -188,7 +190,21 @@ then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
    on **Embed & Sign**. Zebra ships a single framework, so there's no static/dynamic choice.
 3. Once it's on the `App` target, Zebra support turns on by itself. (If your SDK build uses a
    different module name than `ZSDK_API`, adjust it in `ZebraAdapter.swift`.)
+4. **Enable signing for the embedded framework** — see
+   [Enable framework signing (iOS)](#enable-framework-signing-ios).
 
 ![Adding the Zebra iOS xcframework in Xcode](zebra.gif)
 
 On Android, Zebra support turns on by itself once the `.jar` is present.
+
+---
+
+## Enable framework signing (iOS)
+
+After adding a manufacturer `.xcframework` to the `App` target, make sure the framework is
+**signed** by your app. In Xcode, open the **`App`** target ▸ **General** ▸ **Frameworks,
+Libraries, and Embedded Content**, and set the framework's dropdown to **Embed & Sign**
+(not "Do Not Embed" / "Embed Without Signing"). Otherwise the build can fail code-signing or
+the app may be rejected at install.
+
+![Enabling framework signing in Xcode](enable_singin.gif)
