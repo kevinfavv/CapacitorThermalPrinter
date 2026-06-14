@@ -148,8 +148,13 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
 ### iOS
 1. Download the **ePOS SDK for iOS** — [direct download (Epson Download Center)](https://download-center.epson.com/download/?module_id=e5fde6cb-2f38-4bb3-b920-e53ee5b3190f%3A2.37.0&device_id=TM-m10&os=IOS&region=FR&language=fr)
    (or browse from [Epson Developers](https://epson.com/developers-products); Bluetooth MFi: see [MFi / ePOS SDK support](https://global.epson.com/products_and_drivers/tm/en/mfi.html)).
-2. Drag `libepos2.xcframework` (plus `libeposeasyselect.xcframework` if provided) into your
-   Xcode project (app target, *Embed & Sign*).
+2. The SDK archive contains three frameworks — drag the **dynamic** one,
+   **`libepos2.xcframework`**, into your Xcode project (app target, *Embed & Sign*).
+   Optionally add `libeposeasyselect.xcframework` (printer-selection helper).
+   > ⚠️ Do **not** also add `libepos2-static.xcframework` — it's the *static* variant of
+   > `libepos2` (an alternative, not a complement). Since the Capacitor Podfile uses
+   > `use_frameworks!`, use the dynamic `libepos2.xcframework`; adding both causes duplicate
+   > symbols.
 3. `EpsonAdapter.swift` activates via `#if canImport(libepos2)`.
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
    > `EpsonAdapter.swift` (the two lines `canImport(libepos2)` and `import libepos2`).
