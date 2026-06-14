@@ -63,13 +63,8 @@ In production, place them in **your own app project** (see the per-brand section
 > there's no binary to download by hand. Android is fully automatic; on iOS you just add the
 > SPM package once.
 
-### Android ✅ automatic (nothing to do)
-Already wired in `android/build.gradle`:
-```gradle
-implementation "com.starmicronics:stario10:1.12.1"
-```
-Nothing to do: Gradle downloads the SDK from Maven Central. (Bump the version if needed.)
-The `StarAdapter.kt` adapter uses **typed** calls.
+### Android ✅ automatic — nothing to do
+The Star dependency ships with the plugin and Gradle pulls it from Maven Central for you.
 
 ### iOS (one manual step: add the SPM package)
 The Star iOS SDK is distributed via **Swift Package Manager** (there is no official pod).
@@ -98,8 +93,8 @@ The `StarAdapter.swift` adapter activates via `#if canImport(StarIO10)`.
    ```
 4. `BrotherAdapter.kt` (reflection) activates automatically.
 
-### iOS ✅ automatic (via CocoaPods)
-In your app's `Podfile`:
+### iOS (one manual step: add the pod)
+Add the pod to your app's `Podfile` (it's published on CocoaPods, so no binary to download):
 ```ruby
 pod 'BRLMPrinterKit', '~> 4.12'
 ```
