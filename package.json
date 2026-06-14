@@ -1,6 +1,6 @@
 {
   "name": "@delicity/capacitor-thermal-printer",
-  "version": "7.0.0",
+  "version": "7.0.1",
   "description": "@delicity/capacitor-thermal-printer — multi-brand thermal/receipt/label printing for Capacitor 7 (ESC/POS, Epson, Star, Brother, Zebra), image-based, with aggregated discovery and automatic reconnection.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",
@@ -17,11 +17,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/capacitor-thermal-printer.git"
+    "url": "https://github.com/kevinfavv/CapacitorThermalPrinter.git"
   },
   "bugs": {
-    "url": "https://github.com/your-org/capacitor-thermal-printer/issues"
+    "url": "https://github.com/kevinfavv/CapacitorThermalPrinter/issues"
   },
+  "homepage": "https://github.com/kevinfavv/CapacitorThermalPrinter#readme",
   "keywords": [
     "capacitor",
     "plugin",
