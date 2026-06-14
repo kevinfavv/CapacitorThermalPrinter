@@ -84,6 +84,73 @@ In short:
   Zebra/Brother = reflection on Android, `#if canImport` on iOS. See
   [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
 
+## SDK activation & detection (internals)
+
+> Implementation details — for contributors, not for app developers integrating the
+> plugin. End-user setup lives in [`docs/SDK_INTEGRATION.md`](docs/SDK_INTEGRATION.md).
+
+### How activation works
+
+- **Android**: each SDK adapter tests for the binary via **reflection**
+  (`Class.forName(...)` in `isAvailable()`), then drives the SDK by reflection
+  (`SdkReflect.kt`). No compile-time dependency → the plugin compiles without the binary.
+  *Exception*: **Star** is a real Maven dependency (typed calls).
+- **iOS**: each SDK adapter uses **conditional compilation** `#if canImport(Module)`. If the
+  module isn't linked, the typed body is replaced by an inert stub → the plugin compiles
+  without the SDK, with no risk of breakage.
+- **iOS — the SDK only has to be added to the `App` target.** The adapters are compiled
+  inside the `DelicityCapacitorThermalPrinter` pod, but the **podspec already sets
+  `FRAMEWORK_SEARCH_PATHS`** so the pod sees whatever the app adds (Star SPM, Brother pod,
+  Epson/Zebra xcframeworks). `#if canImport(...)` becomes true and the adapter activates
+  automatically — no Podfile `post_install` or manual pod linking needed.
+
+> ⚠️ **The reflective code (Android) and the gated iOS code are not checked by the repo's
+> compiler** (the binaries aren't present). They are written against the SDKs' documented
+> APIs and **must be tested on a real device** with the binary. If a manufacturer API
+> changes, adjust the class/method/module names.
+
+### Checking that an SDK is detected
+
+```kotlin
+// Android
+EpsonAdapter(context).isAvailable()   // true if com.epson.epos2.printer.Printer is on the classpath
+StarAdapter(context).isAvailable()    // true if com.starmicronics.stario10.StarPrinter is present
+```
+```swift
+// iOS
+EpsonAdapter().isAvailable()          // true if #if canImport(libepos2) (or Epos2Printer at runtime)
+StarAdapter().isAvailable()           // true if #if canImport(StarIO10)
+```
+
+During discovery, missing SDK sources are reported in `discoveryComplete.failedSources`
+(non-blocking diagnostic).
+
+### How image printing concepts map per SDK
+
+| Adapter | Discovery | Image printing | Cut | Status |
+|---|---|---|---|---|
+| **Star StarXpand** | `StarDeviceDiscoveryManager` | `PrinterBuilder.actionPrintImage(ImageParameter)` | `actionCut(.partial)` | `getStatus()` |
+| **Epson ePOS2** | `Discovery.start` | `Printer.addImage(bitmap, …, MODE_MONO)` | `addCut(CUT_FEED)` | `PrinterStatusInfo` |
+| **Brother** | `BRLMPrinterSearcher` | `driver.printImage(image, settings)` | settings (auto-cut) | `getPrinterStatus()` |
+| **Zebra Link-OS** | `NetworkDiscoverer`/`BluetoothDiscoverer` | `GraphicsUtil.printImage(…)` → **ZPL** | media command | `getCurrentStatus()` |
+
+#### `printText` per brand
+
+`printText([...])` works on **all** brands:
+
+| Target | `printText` implementation |
+|---|---|
+| ESC/POS (TCP/SPP/USB/BLE), **rawTcp** | native ESC/POS encoder (bytes) |
+| **Star** (Android + iOS) | native StarXpand builder (`actionPrintText`, QR, barcode, cut) |
+| **Epson Android** | native ePOS2 builder (`addText`/`addTextStyle`/`addSymbol`/`addBarcode`) |
+| **Epson iOS, Brother, Zebra** | **automatic image fallback**: items are rendered by `TextRasterizer` then sent via the SDK's `printImage` |
+
+Routing is automatic via `supportsTextItems()`: if an adapter can't map text natively, the
+engine renders the items to a bitmap (monospace font, alignment/bold/underline/size,
+separators) and prints them as an image. In the image fallback, QR/barcode items are rendered
+as **text** — for a precise QR/barcode on Brother/Zebra, use `printImage` with a pre-rendered
+visual.
+
 ## Local development
 
 ```bash

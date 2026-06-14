@@ -8,12 +8,12 @@ generic ESC/POS (TCP/Bluetooth/USB/BLE).
 
 ## TL;DR — which ones download themselves, and which don't?
 
-| Brand | Android | iOS | Plugin-side activation |
-|---|---|---|---|
-| **Star** | ✅ **auto** (Maven Central) | ✅ **auto** (Swift Package Manager) | Android: typed calls · iOS: `#if canImport(StarIO10)` |
-| **Brother** | ⛔ manual binary (`.aar`) | ✅ **auto** (CocoaPods) | Android: reflection · iOS: `#if canImport(BRLMPrinterKit)` |
-| **Epson** | ⛔ manual binary (`.jar` + `.so`) | ⛔ manual xcframework | Android: reflection · iOS: `#if canImport(libepos2)` |
-| **Zebra** | ⚠️ **private** Maven (token) or manual `.jar` | ⛔ manual xcframework | Android: reflection · iOS: `#if canImport(ZSDK_API)` |
+| Brand | Android | iOS |
+|---|---|---|
+| **Star** | ✅ **auto** (Maven Central) | ✅ **auto** (Swift Package Manager) |
+| **Brother** | ⛔ manual binary (`.aar`) | ✅ **auto** (CocoaPods) |
+| **Epson** | ⛔ manual binary (`.jar` + `.so`) | ⛔ manual xcframework |
+| **Zebra** | ⚠️ **private** Maven (token) or manual `.jar` | ⛔ manual xcframework |
 
 > ### Why isn't everything auto-downloaded?
 > Only SDKs published to a **standard package repository** (Maven Central for Android,
@@ -81,18 +81,11 @@ Follow the official StarXpand steps, in your Xcode app project:
 
 4. Run `npx cap sync ios` (or `pod install`) and rebuild. **That's it — no Podfile edit.**
 
-> ℹ️ **Why it just works:** a Swift Package added to your *app target* is normally not
-> visible to a CocoaPods pod (which is what this plugin is). To avoid forcing you into a
-> manual Podfile hook, the plugin's **podspec already adds the build-products directory to
-> its `FRAMEWORK_SEARCH_PATHS`** (`pod_target_xcconfig`), which is where SPM drops
-> `StarIO10.framework`. So `#if canImport(StarIO10)` resolves automatically and the typed
-> Star code compiles; at runtime the symbols resolve from the StarIO10 framework your app
-> embeds via SPM. The same mechanism makes Brother (pod) / Epson / Zebra (xcframeworks)
-> visible once you add them to the app.
+> ℹ️ You don't need to touch the `Podfile`: just adding the SPM package to your app is
+> enough for the plugin to pick Star up — Star support turns on by itself.
 
-> ✅ Verified on a Capacitor 7 app + iOS simulator: after just adding the SPM package,
-> `getActiveSdks()` reports `star: available=true` and Star discovery routes through the
-> real SDK. The adapter activates via `#if canImport(StarIO10)`.
+> ✅ Verified on a Capacitor 7 app + iOS simulator: after adding the SPM package,
+> `getActiveSdks()` reports `star: available=true` and Star discovery routes through the SDK.
 
 ---
 
@@ -108,7 +101,7 @@ Follow the official StarXpand steps, in your Xcode app project:
    repositories { flatDir { dirs 'libs' } }
    dependencies { implementation(name: 'BrotherPrintLibrary', ext: 'aar') }
    ```
-4. `BrotherAdapter.kt` (reflection) activates automatically.
+4. Done — Brother support turns on by itself once the `.aar` is present.
 
 ### iOS (one manual step: add the pod)
 Add the pod to your app's `Podfile` (it's published on CocoaPods, so no binary to download).
@@ -123,8 +116,7 @@ target 'App' do
 end
 ```
 
-Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
-`BrotherAdapter.swift` activates via `#if canImport(BRLMPrinterKit)`.
+Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother support turns on by itself.
 
 ---
 
@@ -143,7 +135,7 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
    -keep class com.epson.** { *; }
    -dontwarn com.epson.**
    ```
-4. `EpsonAdapter.kt` (reflection) activates automatically.
+4. Done — Epson support turns on by itself once `ePOS2.jar` is present.
 
 ### iOS
 1. Download the **ePOS SDK for iOS** — [direct download (Epson Download Center)](https://download-center.epson.com/download/?module_id=e5fde6cb-2f38-4bb3-b920-e53ee5b3190f%3A2.37.0&device_id=TM-m10&os=IOS&region=FR&language=fr)
@@ -155,9 +147,8 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`).
    > `libepos2` (an alternative, not a complement). Since the Capacitor Podfile uses
    > `use_frameworks!`, use the dynamic `libepos2.xcframework`; adding both causes duplicate
    > symbols.
-3. That's all on the app side: once `libepos2.xcframework` is on the `App` target, the plugin
-   pod sees it (see [How activation works](#how-activation-works-technical-summary)) and
-   `EpsonAdapter.swift` activates **automatically** via `#if canImport(libepos2)`.
+3. That's all on the app side: once `libepos2.xcframework` is on the `App` target, Epson
+   support turns on by itself.
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
    > `EpsonAdapter.swift` (the two lines `canImport(libepos2)` and `import libepos2`).
 
@@ -193,78 +184,9 @@ then `implementation files('libs/ZSDK_ANDROID_API.jar')`.
 2. Add `ZSDK_API.xcframework` to the **`App`** target (*Embed & Sign*) — same procedure as
    Epson above (use the **+** button under *Frameworks, Libraries, and Embedded Content*, or
    drag it in). Zebra ships a single framework, so there's no static/dynamic choice.
-3. Once it's on the `App` target, the plugin pod sees it (see
-   [How activation works](#how-activation-works-technical-summary)) and `ZebraAdapter.swift`
-   activates **automatically** via `#if canImport(ZSDK_API)` (adjust the module name if needed).
+3. Once it's on the `App` target, Zebra support turns on by itself. (If your SDK build uses a
+   different module name than `ZSDK_API`, adjust it in `ZebraAdapter.swift`.)
 
 ![Adding the Zebra iOS xcframework in Xcode](zebra.gif)
 
-`ZebraAdapter.kt` (reflection) activates automatically when the `.jar` is present.
-
----
-
-## How activation works (technical summary)
-
-- **Android**: each SDK adapter tests for the binary via **reflection**
-  (`Class.forName(...)` in `isAvailable()`), then drives the SDK by reflection
-  (`SdkReflect.kt`). No compile-time dependency → the plugin compiles without the binary.
-  *Exception*: **Star** is a real Maven dependency (typed calls).
-- **iOS**: each SDK adapter uses **conditional compilation** `#if canImport(Module)`. If the
-  module isn't linked, the typed body is replaced by an inert stub → the plugin compiles
-  without the SDK, with no risk of breakage.
-- **iOS — you only add the SDK to the `App` target.** The adapters are compiled inside the
-  `DelicityCapacitorThermalPrinter` pod, but the **podspec already sets `FRAMEWORK_SEARCH_PATHS`**
-  so the pod sees whatever the app adds (Star SPM, Brother pod, Epson/Zebra xcframeworks).
-  Adding the SDK to `App` is therefore enough — `#if canImport(...)` becomes true and the
-  adapter activates **automatically**. No Podfile `post_install` or manual pod linking needed.
-
-> ⚠️ **The reflective code (Android) and the gated iOS code are not checked by the plugin
-> repo's compiler** (the binaries aren't present). They are written against the SDKs'
-> documented APIs and **must be tested on a real device** with the binary. If a manufacturer
-> API changes, adjust the class/method/module names.
-
----
-
-## Checking that an SDK is detected
-
-```kotlin
-// Android
-EpsonAdapter(context).isAvailable()   // true if com.epson.epos2.printer.Printer is on the classpath
-StarAdapter(context).isAvailable()    // true if com.starmicronics.stario10.StarPrinter is present
-```
-```swift
-// iOS
-EpsonAdapter().isAvailable()          // true if #if canImport(libepos2) (or Epos2Printer at runtime)
-StarAdapter().isAvailable()           // true if #if canImport(StarIO10)
-```
-
-During discovery, missing SDK sources are reported in `discoveryComplete.failedSources`
-(non-blocking diagnostic).
-
----
-
-## How image printing concepts map per SDK
-
-| Adapter | Discovery | Image printing | Cut | Status |
-|---|---|---|---|---|
-| **Star StarXpand** | `StarDeviceDiscoveryManager` | `PrinterBuilder.actionPrintImage(ImageParameter)` | `actionCut(.partial)` | `getStatus()` |
-| **Epson ePOS2** | `Discovery.start` | `Printer.addImage(bitmap, …, MODE_MONO)` | `addCut(CUT_FEED)` | `PrinterStatusInfo` |
-| **Brother** | `BRLMPrinterSearcher` | `driver.printImage(image, settings)` | settings (auto-cut) | `getPrinterStatus()` |
-| **Zebra Link-OS** | `NetworkDiscoverer`/`BluetoothDiscoverer` | `GraphicsUtil.printImage(…)` → **ZPL** | media command | `getCurrentStatus()` |
-
-### `printText` per brand
-
-`printText([...])` works on **all** brands:
-
-| Target | `printText` implementation |
-|---|---|
-| ESC/POS (TCP/SPP/USB/BLE), **rawTcp** | native ESC/POS encoder (bytes) |
-| **Star** (Android + iOS) | native StarXpand builder (`actionPrintText`, QR, barcode, cut) |
-| **Epson Android** | native ePOS2 builder (`addText`/`addTextStyle`/`addSymbol`/`addBarcode`) |
-| **Epson iOS, Brother, Zebra** | **automatic image fallback**: items are rendered by `TextRasterizer` then sent via the SDK's `printImage` |
-
-Routing is automatic via `supportsTextItems()`: if an adapter can't map text natively, the
-engine renders the items to a bitmap (monospace font, alignment/bold/underline/size,
-separators) and prints them as an image. In the image fallback, QR/barcode items are rendered
-as **text** — for a precise QR/barcode on Brother/Zebra, use `printImage` with a pre-rendered
-visual.
+On Android, Zebra support turns on by itself once the `.jar` is present.
