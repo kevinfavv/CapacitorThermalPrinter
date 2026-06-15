@@ -37,8 +37,9 @@ final class EscPosAdapter: PrinterAdapter {
                 "Utilisez une imprimante via son SDK MFi (Star/Epson/Brother). Voir docs/SDK_INTEGRATION.md."
             )
         }
-        let (host, port) = splitHostPort(profile.address, defaultPort: 9100)
-        let t = TcpTransport(host: host, port: port)
+        // `make` gère host:port ET les adresses Bonjour (NWEndpoint.service) — sans quoi
+        // une imprimante découverte par Bonjour ne peut pas être connectée.
+        let t = TcpTransport.make(address: profile.address, defaultPort: 9100)
         try await t.open(timeoutMs: timeoutMs)
         lock.lock(); connections[profile.id] = t; lock.unlock()
     }
@@ -93,14 +94,5 @@ final class EscPosAdapter: PrinterAdapter {
             online: connected, paper: "unknown",
             rawStatus: "ESC/POS TCP: statut temps réel non lu (unidirectionnel)"
         )
-    }
-
-    private func splitHostPort(_ addr: String, defaultPort: UInt16) -> (String, UInt16) {
-        if let idx = addr.lastIndex(of: ":"), addr.firstIndex(of: ":") == idx {
-            let host = String(addr[..<idx])
-            let portStr = String(addr[addr.index(after: idx)...])
-            return (host, UInt16(portStr) ?? defaultPort)
-        }
-        return (addr, defaultPort)
     }
 }

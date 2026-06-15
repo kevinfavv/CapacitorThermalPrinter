@@ -20,13 +20,8 @@ final class RawTcpAdapter: PrinterAdapter {
 
     func connect(_ profile: PrinterProfile, timeoutMs: Int) async throws {
         if isConnected(profile.id) { return }
-        var host = profile.address
-        var port: UInt16 = 9100
-        if let idx = profile.address.lastIndex(of: ":") {
-            host = String(profile.address[..<idx])
-            port = UInt16(profile.address[profile.address.index(after: idx)...]) ?? 9100
-        }
-        let t = TcpTransport(host: host, port: port)
+        // `make` gère host:port ET les adresses Bonjour (NWEndpoint.service).
+        let t = TcpTransport.make(address: profile.address, defaultPort: 9100)
         try await t.open(timeoutMs: timeoutMs)
         lock.lock(); connections[profile.id] = t; lock.unlock()
     }

@@ -24,15 +24,18 @@ final class BonjourScanner {
             let browser = NWBrowser(for: .bonjour(type: service, domain: nil), using: params)
             browser.browseResultsChangedHandler = { results, _ in
                 for result in results {
-                    if case let .service(name, _, _, _) = result.endpoint {
-                        // La résolution IP se fait à la connexion via NWConnection(endpoint:).
+                    if case let .service(name, type, domain, _) = result.endpoint {
+                        // On encode name/type/domain : `TcpTransport.make` reconstruit un
+                        // `NWEndpoint.service` et résout l'IP à la connexion. (Encoder juste
+                        // "name._type" donnait une fausse adresse hôte -> connexion timeout.)
+                        let address = "bonjour:" + [name, type, domain].joined(separator: "\u{1}")
                         let printer = DiscoveredPrinter(
                             id: "wifi:\(name)",
                             name: name,
                             brand: nil, model: nil,
                             transport: .wifi,
                             adapter: .escpos,           // arbitré ensuite par la priorité
-                            address: "\(name)._\(service)",  // résolu via NWEndpoint à la connexion
+                            address: address,
                             capabilities: Capabilities(),
                             discoveredBy: ["escpos", "rawTcp"]
                         )
