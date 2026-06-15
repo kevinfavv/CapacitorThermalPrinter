@@ -4,7 +4,7 @@
 
 For **any Capacitor app that needs to print** — point of sale, receipts, order tickets, shipping/label printing, kitchen slips, etc. The user taps "Add a printer", picks one from a list, runs a test print, and never has to touch the phone's Bluetooth/Wi-Fi settings again.
 
-**Requires Capacitor 7** · Android (`compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
+**Requires Capacitor 7** · Android (**`minSdk 26`**, `compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
 
 > 🚧 **Work in progress.** This plugin is under active development and **not yet
 > validated on real hardware** (see [Tested on real hardware](#tested-on-real-hardware)).
@@ -45,7 +45,7 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
 
 ## Installation
 
-> Package: **`@delicity/capacitor-thermal-printer`** · Capacitor 7 · Android (`compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
+> Package: **`@delicity/capacitor-thermal-printer`** · Capacitor 7 · Android (**`minSdk 26`**, `compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
 
 ### Step by step
 
@@ -79,9 +79,11 @@ At minimum, for Wi-Fi/network printers (see [Permissions](#permissions) for the 
 
 Then re-sync: `npx cap sync ios`.
 
-**4. Android — nothing to configure** for the default path. The plugin ships its own
-manifest permissions (Bluetooth, network, USB feature). Just call
-`requestPermissions()` before scanning (needed for Bluetooth on Android 12+).
+**4. Android — set `minSdk 26`.** The bundled **Star** SDK (`stario10`) requires API 26, so
+your app's `android/variables.gradle` must have `minSdkVersion = 26` (otherwise the manifest
+merge fails). Otherwise nothing to configure: the plugin ships its own manifest permissions
+(Bluetooth, network, USB feature) — just call `requestPermissions()` before scanning
+(needed for Bluetooth on Android 12+).
 
 **5. (Optional) Add a manufacturer SDK** — only if you use **Epson / Star / Brother /
 Zebra** via their native SDK. Generic ESC/POS (Wi-Fi/Bluetooth/USB) and Star work

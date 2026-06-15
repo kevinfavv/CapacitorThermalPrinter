@@ -257,7 +257,7 @@ class ThermalPrinterPlugin : Plugin() {
 
     @PluginMethod
     fun getPrinterStatus(call: PluginCall) = exec(call) {
-        engine.getStatus(call.getString("printerId")).toJson()
+        JSObject.fromJSONObject(engine.getStatus(call.getString("printerId")).toJson())
     }
 
     // ---------------------------------------------------------------------

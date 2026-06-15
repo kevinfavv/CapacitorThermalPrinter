@@ -25,8 +25,8 @@ import com.starmicronics.stario10.starxpandcommand.printer.Alignment
 import com.starmicronics.stario10.starxpandcommand.printer.BarcodeParameter
 import com.starmicronics.stario10.starxpandcommand.printer.BarcodeSymbology
 import com.starmicronics.stario10.starxpandcommand.printer.CutType
+import com.starmicronics.stario10.starxpandcommand.MagnificationParameter
 import com.starmicronics.stario10.starxpandcommand.printer.ImageParameter
-import com.starmicronics.stario10.starxpandcommand.printer.MagnificationParameter
 import com.starmicronics.stario10.starxpandcommand.printer.QRCodeLevel
 import com.starmicronics.stario10.starxpandcommand.printer.QRCodeParameter
 import java.util.concurrent.ConcurrentHashMap
@@ -312,7 +312,7 @@ class StarAdapter(private val context: Context) : PrinterAdapter {
         "ITF" -> BarcodeSymbology.Itf
         "UPCA" -> BarcodeSymbology.UpcA
         "UPCE" -> BarcodeSymbology.UpcE
-        "NW7", "CODABAR" -> BarcodeSymbology.Nw7
+        "NW7", "CODABAR" -> BarcodeSymbology.NW7
         else -> BarcodeSymbology.Code128
     }
 
