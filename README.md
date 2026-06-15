@@ -197,17 +197,23 @@ module names, and the git-ignored test folder.
 
 ### Tested on real hardware
 
-> ⚠️ **No brand has been validated on physical hardware yet.** The native SDK code is
-> implemented but **not yet verified on-device** (see [`CONTRIBUTING.md`](CONTRIBUTING.md)).
-> **Epson** and **Star** are the first brands planned for on-device testing.
+> ✅ **Verified on a real iPhone (iOS):** an **Epson** printer over **Bluetooth (MFi)** and a
+> **generic BLE** ESC/POS printer (MP210) both print full tickets end-to-end — downloaded
+> logo + styled text + **scannable QR** + cut, with correct French accents. See the
+> on-device notes in [`CONTRIBUTING.md`](CONTRIBUTING.md#verified-on-a-real-iphone-manual-june-2026).
 
-| Brand | On-device tested |
+| Target | On-device tested (iOS) |
 |---|---|
+| **Epson** — Bluetooth (MFi) | ✅ **OK on iPhone** (discover + connect + print) |
+| **Generic BLE** ESC/POS (e.g. MP210) | ✅ **OK on iPhone** (logo + text + QR) |
+| Network ESC/POS (Wi-Fi / Bonjour / TCP 9100) | ✅ verified (virtual printer + CI) |
 | **Star** | ⏳ planned |
-| **Epson** | ⏳ planned |
-| **Brother** | ❌ not yet |
-| **Zebra** | ❌ not yet |
-| Generic ESC/POS (Wi-Fi / Bluetooth / USB) | ❌ not yet |
+| **Brother** | ⏳ planned |
+| **Zebra** | ⏳ planned |
+
+> Bluetooth/BLE and MFi can't run on the iOS Simulator, so these are validated **manually on
+> device**; the TCP path is covered automatically in CI. On **iOS, generic Bluetooth Classic
+> (SPP) is not possible** (Apple exposes no API) — use **BLE**, **MFi (brand SDK)** or **Wi-Fi**.
 
 ### Know which SDKs are active (runtime)
 
@@ -715,15 +721,18 @@ catch (e) {
 - USB host (optional).
 
 ### iOS — Apple constraints
-- ❌ **No generic Bluetooth Classic / SPP.** A generic "no-name" BT printer **is not addressable** unless it exposes a usable BLE service.
-- ✅ **MFi manufacturer SDKs** (Epson/Star/Brother/Zebra): this is **the** path for Bluetooth on iOS.
+- ❌ **No generic Bluetooth Classic / SPP.** Apple exposes no API for it; a Classic "no-name"
+  BT printer (visible but un-connectable in iOS Settings) **is not addressable** — unless it
+  also exposes a BLE service (many cheap printers are Classic **+** BLE).
+- ✅ **Generic BLE** (CoreBluetooth) — the plugin ships a generic BLE adapter that scans known
+  ESC/POS BLE services, connects and prints. ✅📱 **verified on iPhone** (MP210: logo + text + QR).
+- ✅ **MFi manufacturer SDKs** (Epson/Star/Brother/Zebra) for Bluetooth/MFi. ✅📱 **Epson verified
+  on iPhone** over Bluetooth (MFi). Requires the brand's MFi protocol string in `Info.plist`.
 - ✅ **Wi-Fi TCP** (port 9100) via `Network.framework` → triggers the **Local Network** prompt.
-- ❌ **No generic BLE GATT exposed by the plugin on iOS.** BLE goes through the MFi
-  SDKs (Star/Epson/Brother). Attempting a `ble`/`bluetooth`/`usb` transport on the
-  generic ESC/POS adapter returns an explicit `UNSUPPORTED_TRANSPORT` error.
 - ❌ No USB host for this use case.
 
-> **Never promise** universal Bluetooth compatibility on iOS. In practice: **Wi-Fi for everyone, Bluetooth via the manufacturer SDK**.
+> On iOS, for Bluetooth: **BLE (generic) or MFi (brand SDK)** — never generic Classic/SPP.
+> Wi-Fi works for everyone.
 
 ## Image cache & logs/diagnostics
 
