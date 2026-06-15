@@ -32,9 +32,27 @@ final class EpsonAdapter: PrinterAdapter {
     func canHandle(_ profile: PrinterProfile) -> Bool { isAvailable() && profile.adapter == .epson }
 
     func discover(timeoutMs: Int, onFound: @escaping (DiscoveredPrinter) -> Void) async {
-        // La découverte Epson (Epos2Discovery) nécessite un delegate ObjC ; les
-        // imprimantes Epson réseau restent trouvées par le scan TCP générique.
-        // Découverte SDK dédiée à activer si besoin (voir docs).
+        #if canImport(libepos2)
+        // Découverte SDK ePOS2 : TCP + Bluetooth (MFi) + BLE + USB. Indispensable pour les
+        // imprimantes Epson en Bluetooth (le scan réseau générique ne les voit pas).
+        // ⚠️ L'app DOIT déclarer la protocol string MFi Epson `com.epson.escpos` dans
+        // `UISupportedExternalAccessoryProtocols` (Info.plist), sinon iOS ne remonte pas
+        // l'imprimante appairée — voir docs/SDK_INTEGRATION.md (§ Epson iOS).
+        let filter = Epos2FilterOption()
+        filter.deviceType = EPOS2_TYPE_ALL.rawValue
+        filter.portType = EPOS2_PORTTYPE_ALL.rawValue
+        let delegate = EpsonDiscoveryDelegate(onFound: onFound)
+        var result = Epos2Discovery.start(filter, delegate: delegate)
+        if result != EPOS2_SUCCESS.rawValue {
+            _ = Epos2Discovery.stop() // un scan précédent traîne peut-être : on réessaie
+            result = Epos2Discovery.start(filter, delegate: delegate)
+        }
+        guard result == EPOS2_SUCCESS.rawValue else { return }
+        // Scan asynchrone (callbacks delegate) : on le laisse courir puis on l'arrête.
+        try? await Task.sleep(nanoseconds: UInt64(max(1000, timeoutMs)) * 1_000_000)
+        _ = Epos2Discovery.stop()
+        withExtendedLifetime(delegate) {} // garder le delegate vivant pendant tout le scan
+        #endif
     }
 
     func connect(_ profile: PrinterProfile, timeoutMs: Int) async throws {
@@ -105,7 +123,8 @@ final class EpsonAdapter: PrinterAdapter {
 
     #if canImport(libepos2)
     private static func target(for profile: PrinterProfile) -> String {
-        if profile.address.hasPrefix("TCP:") || profile.address.hasPrefix("BT:") || profile.address.hasPrefix("USB:") {
+        if profile.address.hasPrefix("TCP:") || profile.address.hasPrefix("BT:")
+            || profile.address.hasPrefix("BLE:") || profile.address.hasPrefix("USB:") {
             return profile.address
         }
         switch profile.transport {
@@ -129,3 +148,34 @@ final class EpsonAdapter: PrinterAdapter {
     }
     #endif
 }
+
+#if canImport(libepos2)
+/// Delegate de découverte ePOS2 : relaie chaque appareil trouvé vers `onFound`.
+/// L'`address` est le `target` exact attendu par `Epos2Printer.connect` (ex.
+/// `BT:xx:xx:xx`, `TCP:192.168.x.x`, `BLE:xxxx`), donc une imprimante découverte
+/// peut être connectée telle quelle.
+private final class EpsonDiscoveryDelegate: NSObject, Epos2DiscoveryDelegate {
+    private let onFound: (DiscoveredPrinter) -> Void
+    init(onFound: @escaping (DiscoveredPrinter) -> Void) { self.onFound = onFound }
+
+    func onDiscovery(_ deviceInfo: Epos2DeviceInfo!) {
+        guard let info = deviceInfo else { return }
+        let target = info.target ?? ""
+        if target.isEmpty { return }
+        let transport: Transport
+        if target.hasPrefix("BT:") { transport = .bluetooth }
+        else if target.hasPrefix("BLE:") { transport = .ble }
+        else if target.hasPrefix("USB:") { transport = .usb }
+        else { transport = .wifi }
+        let name = info.deviceName ?? ""
+        onFound(DiscoveredPrinter(
+            id: "epson:\(target)",
+            name: name.isEmpty ? "Epson" : name,
+            brand: "Epson",
+            transport: transport,
+            adapter: .epson,
+            address: target,
+            discoveredBy: ["epson"]))
+    }
+}
+#endif
