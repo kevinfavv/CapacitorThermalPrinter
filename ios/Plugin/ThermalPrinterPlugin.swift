@@ -100,8 +100,9 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         let timeout = call.getInt("timeoutMs") ?? 10000
         let force = call.getString("forceAdapter").map { AdapterId.from($0) }
         let setAsDefault = call.getBool("setAsDefault") ?? false
+        let paperWidthMm = call.getInt("paperWidthMm")
         Task { await self.guarded(call) {
-            let result = try await self.engine.connect(printerId, timeoutMs: timeout, forceAdapter: force, setAsDefault: setAsDefault)
+            let result = try await self.engine.connect(printerId, timeoutMs: timeout, forceAdapter: force, setAsDefault: setAsDefault, paperWidthMm: paperWidthMm)
             call.resolve(["connected": result.connected, "paper": result.paper?.toDict() ?? NSNull()])
         } }
     }
@@ -143,6 +144,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         if let r = call.getObject("render") {
             render = RenderOptions(
                 widthDots: r["widthDots"] as? Int ?? 0,
+                paperWidthMm: r["paperWidthMm"] as? Int,
                 resize: r["resize"] as? Bool ?? true,
                 grayscale: r["grayscale"] as? Bool ?? true,
                 threshold: r["threshold"] as? Int ?? 128,

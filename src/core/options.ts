@@ -21,6 +21,13 @@ export interface PrintRenderOptions {
    */
   widthDots?: number;
   /**
+   * Largeur **papier en mm** (ex: 58, 80, 112). Pratique pour l'ESC/POS quand on ne
+   * veut pas raisonner en points : convertie en `widthDots` (58→384, 80→576, 112→832 ;
+   * sinon proportionnel). Ignorée si `widthDots` est fourni. Voir aussi
+   * `ConnectOptions.paperWidthMm` pour fixer la largeur par défaut d'une imprimante.
+   */
+  paperWidthMm?: number;
+  /**
    * Redimensionner l'image à la largeur cible. Défaut `true`.
    * Mettre `false` si l'image est DÉJÀ à la bonne largeur (rendu serveur) :
    * envoi tel quel, pixel-perfect, plus rapide.
@@ -144,6 +151,13 @@ export interface ConnectOptions {
   printerId: string;
   /** Timeout de connexion ms. Défaut 10000. */
   timeoutMs?: number;
+  /**
+   * Largeur **papier en mm** (ex: 58, 80, 112) à fixer comme **défaut de cette imprimante**.
+   * Persistée : s'applique ensuite à `printImage` ET `printText` sans avoir à la repréciser.
+   * Utile pour l'ESC/POS générique (ex: une MP210 en BLE → `paperWidthMm: 80`). Par défaut,
+   * les imprimantes ESC/POS sont en **80mm (576 dots)**.
+   */
+  paperWidthMm?: number;
   /** Forcer un adapter (sinon: celui résolu à la découverte / dans le profil). */
   forceAdapter?: PrinterAdapterId;
   /**

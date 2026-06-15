@@ -161,6 +161,9 @@ struct PrinterStatus {
 
 struct RenderOptions {
     var widthDots: Int
+    /// Largeur papier en mm (ex. 58/80/112). Si fourni et `widthDots` non défini,
+    /// la largeur en points est déduite (58→384, 80→576, 112→832).
+    var paperWidthMm: Int?
     var resize: Bool = true
     var grayscale: Bool = true
     var threshold: Int = 128

@@ -54,8 +54,14 @@ final class ThermalPrinterEngine {
     /// Résultat de connexion : état + taille papier déduite (best-effort, nil si inconnue).
     struct ConnectResult { let connected: Bool; let paper: PaperInfo? }
 
-    func connect(_ printerId: String, timeoutMs: Int, forceAdapter: AdapterId?, setAsDefault: Bool = false) async throws -> ConnectResult {
-        let profile = try resolveProfile(printerId, forceAdapter: forceAdapter)
+    func connect(_ printerId: String, timeoutMs: Int, forceAdapter: AdapterId?, setAsDefault: Bool = false, paperWidthMm: Int? = nil) async throws -> ConnectResult {
+        var profile = try resolveProfile(printerId, forceAdapter: forceAdapter)
+        // Largeur papier explicite (mm) : devient la largeur par défaut de CETTE imprimante
+        // (utilisée par printImage ET printText). Persistée pour les impressions suivantes.
+        if let mm = paperWidthMm {
+            profile.capabilities.paperWidthMm = mm
+            profile.capabilities.printableDots = Self.dots(forMm: mm)
+        }
         guard let adapter = adapterFor(profile.adapter) else {
             throw PrinterError(.UNSUPPORTED_PRINTER, "Aucun adapter pour \(profile.adapter.rawValue)")
         }
@@ -64,9 +70,12 @@ final class ThermalPrinterEngine {
         }
         try await adapter.connect(profile, timeoutMs: timeoutMs)
         let connected = adapter.isConnected(printerId)
-        // setAsDefault UNIQUEMENT si la connexion a réussi.
-        if connected && setAsDefault {
+        // Persiste le profil si on fixe la largeur (pour que printText/printImage la voient)
+        // ou si on le définit par défaut. setAsDefault UNIQUEMENT si la connexion a réussi.
+        if connected && (setAsDefault || paperWidthMm != nil) {
             store.upsert(profile)
+        }
+        if connected && setAsDefault {
             store.setDefault(printerId)
             Logger.shared.log("connect", "set-default-after-connect", ["id": printerId])
         }
@@ -389,12 +398,22 @@ final class ThermalPrinterEngine {
 
     private func resolveRenderOptions(_ profile: PrinterProfile, _ req: RenderOptions?) -> RenderOptions {
         var width = req?.widthDots ?? 0
-        if width <= 0 { width = profile.capabilities.printableDots }
-        if width <= 0 {
-            width = profile.capabilities.paperWidthMm == 58 ? 384 : (profile.capabilities.paperWidthMm == 112 ? 832 : 576)
-        }
+        if width <= 0, let mm = req?.paperWidthMm { width = Self.dots(forMm: mm) }   // mm explicite (appel)
+        if width <= 0 { width = profile.capabilities.printableDots }                 // largeur du profil
+        if width <= 0 { width = Self.dots(forMm: profile.capabilities.paperWidthMm) } // mm du profil
         var opts = req ?? RenderOptions(widthDots: width)
         opts.widthDots = width
         return opts
+    }
+
+    /// Largeur imprimable (points) pour une largeur papier en mm. Presets usuels
+    /// (203 dpi) ; sinon proportionnel à 80mm→576.
+    static func dots(forMm mm: Int) -> Int {
+        switch mm {
+        case 58: return 384
+        case 80: return 576
+        case 112: return 832
+        default: return max(384, Int((Double(mm) * 576.0 / 80.0).rounded()))
+        }
     }
 }
