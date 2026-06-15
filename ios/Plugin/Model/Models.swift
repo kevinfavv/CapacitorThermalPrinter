@@ -8,7 +8,7 @@ enum Transport: String, Codable {
 
 /// Identifiants d'adapter. Aligné avec PrinterAdapterId (TypeScript).
 enum AdapterId: String, Codable {
-    case escpos, epson, star, brother, zebra
+    case escpos, epson, star, brother, zebra, ble
     case rawTcp = "rawTcp"
     static func from(_ v: String?) -> AdapterId { AdapterId(rawValue: v ?? "") ?? .escpos }
 }

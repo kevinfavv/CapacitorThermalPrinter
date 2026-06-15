@@ -10,7 +10,7 @@ final class ThermalPrinterEngine {
     /// Registry d'adapters (l'ordre n'importe pas, priorité gérée ailleurs).
     private lazy var adapters: [PrinterAdapter] = [
         EpsonAdapter(), StarAdapter(), BrotherAdapter(), ZebraAdapter(),
-        EscPosAdapter(), RawTcpAdapter(),
+        EscPosAdapter(), RawTcpAdapter(), BleAdapter(),
     ]
 
     private var lastDiscovered: [DiscoveredPrinter] = []

@@ -40,6 +40,7 @@ final class DiscoveryManager {
                 case .star: src = "star"
                 case .brother: src = "brother"
                 case .zebra: src = "zebra"
+                case .ble: src = "ble"
                 default: src = nil
                 }
                 if let src = src, enabled(src), adapter.isAvailable() {
