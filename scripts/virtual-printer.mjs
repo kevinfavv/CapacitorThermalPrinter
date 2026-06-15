@@ -83,29 +83,49 @@ export function startVirtualPrinter({ port = 9100, outDir = null, quiet = false 
       }
     }
 
+    function finalize(chunks) {
+      if (!chunks.length) return;
+      const bytes = Buffer.concat(chunks);
+      const decoded = decodeJob(bytes);
+      const n = ++jobN;
+      if (outDir) {
+        fs.mkdirSync(outDir, { recursive: true }); // robuste si le dossier a été supprimé
+        fs.writeFileSync(path.join(outDir, `job-${n}.bin`), bytes);
+        decoded.rasters.forEach((r, k) => writePbm(path.join(outDir, `job-${n}-img${k}.pbm`), r));
+      }
+      if (!quiet) {
+        const imgs = decoded.rasters.map((r) => `${r.widthDots}×${r.height}`).join(', ') || 'aucune';
+        console.log(
+          `🧾 Job #${n} reçu : ${decoded.size} octets · init=${decoded.hasInit} · ` +
+            `coupe=${decoded.hasCut} · texte≈${decoded.textChars} car · images=[${imgs}]` +
+            (outDir ? ` → ${path.join(outDir, `job-${n}.*`)}` : ''),
+        );
+      }
+      emit({ bytes, ...decoded });
+    }
+
     const server = net.createServer((socket) => {
-      const chunks = [];
-      socket.on('data', (d) => chunks.push(d));
-      socket.on('error', () => {});
-      socket.on('close', () => {
-        if (!chunks.length) return;
-        const bytes = Buffer.concat(chunks);
-        const decoded = decodeJob(bytes);
-        const n = ++jobN;
-        if (outDir) {
-          fs.writeFileSync(path.join(outDir, `job-${n}.bin`), bytes);
-          decoded.rasters.forEach((r, k) => writePbm(path.join(outDir, `job-${n}-img${k}.pbm`), r));
+      // Une vraie imprimante réseau garde souvent la connexion ouverte (connect puis
+      // écritures). On flush donc un "job" soit à la fermeture, soit après un court
+      // silence (idle), pour capturer même sur connexion persistante.
+      let chunks = [];
+      let idle = null;
+      const flush = () => {
+        if (idle) {
+          clearTimeout(idle);
+          idle = null;
         }
-        if (!quiet) {
-          const imgs = decoded.rasters.map((r) => `${r.widthDots}×${r.height}`).join(', ') || 'aucune';
-          console.log(
-            `🧾 Job #${n} reçu : ${decoded.size} octets · init=${decoded.hasInit} · ` +
-              `coupe=${decoded.hasCut} · texte≈${decoded.textChars} car · images=[${imgs}]` +
-              (outDir ? ` → ${path.join(outDir, `job-${n}.*`)}` : ''),
-          );
-        }
-        emit({ bytes, ...decoded });
+        const c = chunks;
+        chunks = [];
+        finalize(c);
+      };
+      socket.on('data', (d) => {
+        chunks.push(d);
+        if (idle) clearTimeout(idle);
+        idle = setTimeout(flush, 1200); // burst terminé -> on matérialise le ticket
       });
+      socket.on('error', () => {});
+      socket.on('close', flush);
     });
 
     server.on('error', reject);
