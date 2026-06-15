@@ -179,7 +179,10 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         let req = ThermalPrinterEngine.PrintTextRequest(
             printerId: call.getString("printerId"),
             items: PrintItem.parseList(rawItems),
-            defaultCodePage: call.getString("defaultCodePage") ?? "WPC1252",
+            // Défaut CP437 : page de code par défaut de la quasi-totalité des imprimantes
+            // ESC/POS (les WPC1252 sont rares) -> accents FR corrects sans config. L'app
+            // peut surcharger via defaultCodePage / le style d'item.
+            defaultCodePage: call.getString("defaultCodePage") ?? "CP437",
             cut: call.getBool("cut") ?? false,
             feedLines: call.getInt("feedLines") ?? 3,
             timeoutMs: call.getInt("timeoutMs") ?? 15000,

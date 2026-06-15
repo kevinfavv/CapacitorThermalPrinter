@@ -17,8 +17,36 @@ enum EscPosTextEncoder {
 
     struct Encoded { let bytes: [UInt8]; let imageIndexes: [Int] }
 
-    static func encodeString(_ value: String) -> [UInt8] {
-        value.unicodeScalars.map { $0.value <= 0xFF ? UInt8($0.value) : 0x3F }
+    /// Caractères FR usuels -> octet pour les pages DOS (CP437/850/858), où é/à/ç… n'ont
+    /// PAS la même valeur qu'en Latin-1. Indispensable : beaucoup d'imprimantes ESC/POS
+    /// bon marché sont en CP437 (envoyer du Latin-1 donne des accents cassés : ç→τ…).
+    private static let dosFrenchAccents: [UInt32: UInt8] = [
+        0xE9: 0x82, 0xE8: 0x8A, 0xEA: 0x88, 0xEB: 0x89, // é è ê ë
+        0xE0: 0x85, 0xE2: 0x83, 0xE4: 0x84,             // à â ä
+        0xE7: 0x87,                                     // ç
+        0xF9: 0x97, 0xFB: 0x96, 0xFC: 0x81,             // ù û ü
+        0xEE: 0x8C, 0xEF: 0x8B,                         // î ï
+        0xF4: 0x93, 0xF6: 0x94,                         // ô ö
+        0xB0: 0xF8, 0xAB: 0xAE, 0xBB: 0xAF,             // ° « »
+        0x2014: 0x2D, 0x2013: 0x2D, 0x2019: 0x27,       // — – -> -, ' -> '
+    ]
+
+    private static func accentMap(_ codePage: String) -> [UInt32: UInt8] {
+        switch codePage {
+        case "CP858": var m = dosFrenchAccents; m[0x20AC] = 0xD5; return m // + €
+        case "CP437", "CP850": return dosFrenchAccents
+        default: return [:] // WPC1252 / Latin-1 : octet Unicode bas direct
+        }
+    }
+
+    /// Encode une chaîne pour la page de code donnée. Pour WPC1252/Latin-1 : octet bas.
+    /// Pour CP437/850/858 : accents FR remappés vers les bons octets.
+    static func encodeString(_ value: String, codePage: String = "WPC1252") -> [UInt8] {
+        let map = accentMap(codePage)
+        return value.unicodeScalars.map { sc in
+            if let b = map[sc.value] { return b }
+            return sc.value <= 0xFF ? UInt8(sc.value) : 0x3F
+        }
     }
 
     static func sizeByte(_ w: Int, _ h: Int) -> UInt8 {
@@ -80,7 +108,7 @@ enum EscPosTextEncoder {
             switch item {
             case let .text(value, style):
                 openStyle(&out, style, defaultCodePage)
-                out += encodeString(value)
+                out += encodeString(value, codePage: style.codePage ?? defaultCodePage)
                 if style.newline { out.append(LF) }
                 out += [ESC, 0x40]
             case let .feed(lines):
