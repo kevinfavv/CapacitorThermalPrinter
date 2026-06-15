@@ -35,8 +35,8 @@ capacitor-thermal-printer/
 │   ├── ThermalPrinterPlugin.swift + .m   # Capacitor bridge
 │   ├── ThermalPrinterEngine.swift
 │   ├── Logger.swift
-│   ├── Adapters/  (PrinterAdapter, EscPos, Epson, Star, Brother, Zebra, RawTcp)
-│   ├── Transport/ (TcpTransport — Network.framework)
+│   ├── Adapters/  (PrinterAdapter, EscPos, Epson, Star, Brother, Zebra, RawTcp, Ble, ZebraBridge)
+│   ├── Transport/ (TcpTransport — Network.framework ; BleTransport — CoreBluetooth)
 │   ├── Discovery/ (DiscoveryManager, BonjourScanner, AdapterPriority)
 │   ├── Image/     (ImageProcessor, ImageCache, TextRasterizer)
 │   ├── Store/     (PrinterStore)
@@ -201,22 +201,44 @@ xcodebuild test -scheme DelicityCapacitorThermalPrinter -enableCodeCoverage YES
 
 ## Implementation status
 
-Legend: ✅ done & verifiable (TS/transports/plugin logic) · ✅◷ implemented, **needs
-on-device validation** (native SDK code not compiled in this repo) · 🟡 partial.
+Legend: ✅ done & verifiable (TS/transports/plugin logic) · ✅📱 **verified on a real iPhone**
+· ✅◷ implemented, **needs on-device validation** (native SDK code not compiled in this repo)
+· 🟡 partial.
 
 | Area | Content | Status |
 |---|---|---|
 | Core | Plugin scaffold, TS types, adapter registry, default-printer store, **ESC/POS over Wi-Fi TCP 9100** | ✅ |
 | Bluetooth | **Android Bluetooth Classic** (SPP) for ESC/POS | ✅ |
 | Star SDK | auto-download (Maven/SPM), typed calls | ✅ |
-| Epson SDK | Android reflection / iOS `canImport` | ✅◷ |
+| Epson SDK | Android reflection / **iOS `canImport` + SDK discovery (Bluetooth MFi/TCP/BLE)** | **✅📱** (iPhone: discover + connect + print) |
 | Brother | Android reflection / iOS `canImport` (iOS via pod) | ✅◷ |
 | Zebra | Android reflection / iOS **ObjC runtime bridge** (`ZebraBridge`, static lib + `-ObjC`) | ✅◷ |
-| iOS | Wi-Fi TCP + Star/Epson SDK; **BLE via MFi SDK** (no generic GATT exposed) | ✅ |
+| iOS generic BLE | **CoreBluetooth adapter** (`BleManager`/`BleAdapter`) for ESC/POS BLE printers (scan known services, writable characteristic, chunked write) | **✅📱** (iPhone: MP210 logo + text + QR) |
+| iOS Bonjour | network discovery → **connect via `NWEndpoint.service`** (was timing out on the service name) | ✅📱 |
+| Paper size | **`paperWidthMm`** at connect (persisted) + per `printImage`; mm→dots; ESC/POS default 80mm | ✅📱 |
+| Accents (ESC/POS) | **code-page-aware encoder** (CP437/850/858 maps) + **CP437 default** → accents FR corrects | ✅📱 |
+| `printText` codes | QR/CODE128 en **vraie image** (CoreImage) dans le fallback image (Epson/Brother/Zebra) ; QR/barcode natifs en ESC/POS | ✅📱 |
+| iOS | Wi-Fi TCP + Star/Epson SDK + **generic BLE** | ✅📱 |
 | Monitoring | `start/stopStatusMonitor` + **backoff reconnection** + **hold recovery** | ✅ |
 | Android transports | **BLE GATT** (MTU, UUID allowlist) + **USB host** (bulk OUT) | ✅◷ |
 | Styled `printText` | native ESC/POS + Star native + Epson-Android native; Brother/Zebra/Epson-iOS → image fallback (`TextRasterizer`) | ✅ |
 | Diagnostics | `getActiveSdks()` + job events + debug log | ✅ |
+
+### Verified on a real iPhone (manual, June 2026)
+
+End-to-end on a physical iPhone 16 (Capacitor 7 host app), each printing a full ticket
+(downloaded logo + styled text + QR + cut):
+
+- **Epson** (Bluetooth/MFi, ePOS2 SDK) — discovered, connected, printed. *Requires*
+  `com.epson.escpos` in `UISupportedExternalAccessoryProtocols` + Bluetooth permission.
+- **Generic BLE printer** (MP210, CoreBluetooth) — discovered, connected, printed
+  (logo + text + **QR scannable** + accents FR via CP437).
+- **Network (Bonjour/TCP 9100)** — discovered + printed (verified via a virtual ESC/POS
+  printer; see `docs/TESTING_SDK.md`).
+
+> Bluetooth/BLE and MFi cannot run on the iOS Simulator (no Bluetooth stack), so these are
+> validated manually on device. The TCP path is covered automatically in CI
+> (`test/escpos-tcp.integration.spec.ts`).
 
 See [`ROADMAP.md`](ROADMAP.md) for the remaining work.
 
