@@ -158,6 +158,18 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother suppo
 
 4. **Enable signing for the embedded framework(s)** — see
    [Enable framework signing (iOS)](#enable-framework-signing-ios).
+5. **For Bluetooth (MFi) Epson printers**, add to your app's `Info.plist` (otherwise iOS
+   won't surface the paired printer and discovery finds nothing):
+   ```xml
+   <key>UISupportedExternalAccessoryProtocols</key>
+   <array><string>com.epson.escpos</string></array>
+   <key>NSBluetoothAlwaysUsageDescription</key>
+   <string>Discover and print to Bluetooth printers.</string>
+   ```
+   Wi-Fi/network Epson printers also need `NSLocalNetworkUsageDescription` +
+   `NSBonjourServices` (see the network-discovery note). Grant the Bluetooth / Local Network
+   prompts on first launch, then relaunch — `discoverPrinters()` then returns the Epson over
+   Bluetooth/Wi-Fi and `connectPrinter` / `printImage` / `printText` work.
 
 ---
 
