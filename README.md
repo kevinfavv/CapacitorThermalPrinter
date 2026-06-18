@@ -207,7 +207,7 @@ module names, and the git-ignored test folder.
 | Target | On-device tested (iOS) | On-device tested (Android) |
 |---|---|---|
 | **Epson** — Bluetooth (MFi iOS / ePOS2 Android) | ✅ **OK on iPhone** | ✅ **OK on Android** |
-| **Epson** — Network (Wi-Fi / TCP) | ✅ verified | ✅ **tested on Android** |
+| **Epson** — Network (Wi-Fi / TCP) | ✅ **OK on iPhone** (real Epson) | ✅ **tested on Android** |
 | **Generic BLE** ESC/POS (e.g. MP210) | ✅ **OK on iPhone** | ✅ **tested on Android** |
 | **Generic Bluetooth Classic** (SPP) ESC/POS | ⛔ N/A (no iOS API) | ✅ **tested on Android** |
 | Network ESC/POS (Wi-Fi / Bonjour / TCP 9100) | ✅ verified (virtual printer + CI) | ✅ **tested on Android** |
