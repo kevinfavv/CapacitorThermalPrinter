@@ -25,9 +25,36 @@ class EscPosTextEncoderTest {
     }
 
     @Test
-    fun `encodeString gere les accents francais en mono-octet`() {
+    fun `encodeString WPC1252 sort l'octet Latin-1 direct`() {
         assertEquals(listOf(0xE9), EscPosTextEncoder.encodeString("é").map { it.toInt() and 0xFF })
         assertEquals(listOf(0x3F), EscPosTextEncoder.encodeString("€").map { it.toInt() and 0xFF }) // hors plage -> ?
+    }
+
+    @Test
+    fun `encodeString CP437 remappe les accents FR vers les octets DOS`() {
+        // En CP437 é/à/ç ne valent PAS leur octet Latin-1 (sinon é->Θ sur l'imprimante).
+        assertEquals(
+            listOf(0x82, 0x85, 0x87, 0x97, 0x88),
+            EscPosTextEncoder.encodeString("éàçùê", "CP437").map { it.toInt() and 0xFF },
+        )
+        // € indisponible en CP437 -> ?
+        assertEquals(listOf(0x3F), EscPosTextEncoder.encodeString("€", "CP437").map { it.toInt() and 0xFF })
+    }
+
+    @Test
+    fun `encodeString CP858 ajoute l'euro`() {
+        assertEquals(listOf(0xD5), EscPosTextEncoder.encodeString("€", "CP858").map { it.toInt() and 0xFF })
+        assertEquals(listOf(0x82), EscPosTextEncoder.encodeString("é", "CP858").map { it.toInt() and 0xFF })
+    }
+
+    @Test
+    fun `encode applique la page de code aux accents du texte`() {
+        // defaultCodePage=CP437 -> é encodé 0x82 (pas 0xE9) ET ESC t 0 émis.
+        val b = EscPosTextEncoder.encode(listOf(PrintItem.Text("é", TextStyle())), "CP437")
+            .bytes.map { it.toInt() and 0xFF }
+        assertTrue(b.joinToString(",").contains("27,116,0")) // ESC t 0 (CP437)
+        assertTrue(b.contains(0x82)) // é remappé
+        assertTrue(!b.contains(0xE9)) // surtout PAS l'octet Latin-1
     }
 
     @Test

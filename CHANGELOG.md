@@ -4,6 +4,22 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.0.7]
+
+### Corrigé
+- **Android — accents cassés en ESC/POS générique (BLE + Bluetooth).** L'encodeur
+  Android envoyait toujours les octets Latin-1 sans tenir compte de la page de code :
+  sur une imprimante en CP437 (très répandu), `é`/`à`/`ç`… sortaient en grec/cyrillique
+  (é→Θ, à→α…). `EscPosTextEncoder` est désormais **conscient de la page de code**
+  (miroir d'iOS) : `encodeString(value, codePage)` remappe les accents FR vers les bons
+  octets DOS pour CP437/CP850/CP858. Même correction portée à l'encodeur TS de référence
+  (parité TS/Kotlin/Swift). Sélectionner la page via `defaultCodePage` (ex. `'CP437'`).
+- **Android — image/logo non imprimée en Bluetooth-classic (SPP).** Les imprimantes SPP
+  bon marché n'ont pas de contrôle de flux : un gros raster envoyé d'un trait débordait
+  leur buffer (image perdue) alors que le texte passait. `BluetoothSppTransport` cadence
+  désormais les gros jobs (paquets de 512 o + micro-pause de 15 ms). Le BLE n'était pas
+  affecté (ACK par paquet).
+
 ## [7.0.6]
 
 ### Corrigé

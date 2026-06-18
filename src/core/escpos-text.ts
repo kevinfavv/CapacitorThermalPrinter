@@ -46,15 +46,47 @@ function concat(parts: number[][]): Uint8Array {
 }
 
 /**
+ * Caractères FR usuels -> octet pour les pages DOS (CP437/850/858), où é/à/ç… n'ont
+ * PAS la même valeur qu'en Latin-1. Indispensable : beaucoup d'imprimantes ESC/POS
+ * bon marché sont en CP437 (envoyer du Latin-1 donne des accents cassés : é→Θ, à→α…).
+ * Miroir de EscPosTextEncoder.swift (iOS) / EscPosTextEncoder.kt (Android).
+ */
+const DOS_FRENCH_ACCENTS: Record<number, number> = {
+  0xe9: 0x82, 0xe8: 0x8a, 0xea: 0x88, 0xeb: 0x89, // é è ê ë
+  0xe0: 0x85, 0xe2: 0x83, 0xe4: 0x84, // à â ä
+  0xe7: 0x87, // ç
+  0xf9: 0x97, 0xfb: 0x96, 0xfc: 0x81, // ù û ü
+  0xee: 0x8c, 0xef: 0x8b, // î ï
+  0xf4: 0x93, 0xf6: 0x94, // ô ö
+  0xb0: 0xf8, 0xab: 0xae, 0xbb: 0xaf, // ° « »
+  0x2014: 0x2d, 0x2013: 0x2d, 0x2019: 0x27, // — – -> -, ' -> '
+};
+
+function accentMap(codePage: CodePage): Record<number, number> {
+  switch (codePage) {
+    case 'CP858':
+      return { ...DOS_FRENCH_ACCENTS, 0x20ac: 0xd5 }; // + €
+    case 'CP437':
+    case 'CP850':
+      return DOS_FRENCH_ACCENTS;
+    default:
+      return {}; // WPC1252 / Latin-1 : octet Unicode bas direct
+  }
+}
+
+/**
  * Encode une chaîne vers une page de code mono-octet.
  * Pour WPC1252/Latin-1, le code-point Unicode == octet pour 0x00..0xFF (couvre FR).
- * Les caractères hors plage sont remplacés par '?'.
+ * Pour CP437/850/858, les accents FR sont remappés vers les bons octets DOS (sinon é→Θ
+ * sur les imprimantes en page DOS). Les caractères hors plage sont remplacés par '?'.
  */
-export function encodeString(value: string): number[] {
+export function encodeString(value: string, codePage: CodePage = 'WPC1252'): number[] {
+  const map = accentMap(codePage);
   const bytes: number[] = [];
   for (const ch of value) {
     const cp = ch.codePointAt(0) ?? 0x3f;
-    bytes.push(cp <= 0xff ? cp : 0x3f);
+    const mapped = map[cp];
+    bytes.push(mapped !== undefined ? mapped : cp <= 0xff ? cp : 0x3f);
   }
   return bytes;
 }
@@ -210,7 +242,7 @@ export function encodeEscPosItems(items: PrintItem[], opts: EscPosTextOptions = 
       case 'text': {
         const style = item.style ?? {};
         parts.push(openStyle(style, opts));
-        parts.push(encodeString(item.value));
+        parts.push(encodeString(item.value, style.codePage ?? opts.defaultCodePage ?? 'WPC1252'));
         if (style.newline !== false) parts.push([LF]);
         parts.push(resetStyle());
         break;

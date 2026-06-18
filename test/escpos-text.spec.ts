@@ -23,6 +23,15 @@ describe('encodeString', () => {
     expect(encodeString('à')).toEqual([0xe0]);
     expect(encodeString('€')).toEqual([0x3f]);
   });
+  it('remappe les accents FR vers les octets DOS en CP437', () => {
+    // En CP437, é/à/ç ne valent PAS leur octet Latin-1 (sinon é->Θ sur l’imprimante).
+    expect(encodeString('éàçùê', 'CP437')).toEqual([0x82, 0x85, 0x87, 0x97, 0x88]);
+    expect(encodeString('€', 'CP437')).toEqual([0x3f]); // € indisponible en CP437
+  });
+  it('ajoute l’euro en CP858', () => {
+    expect(encodeString('€', 'CP858')).toEqual([0xd5]);
+    expect(encodeString('é', 'CP858')).toEqual([0x82]);
+  });
 });
 
 describe('sizeByte (GS ! n)', () => {

@@ -29,9 +29,47 @@ object EscPosTextEncoder {
 
     data class Encoded(val bytes: ByteArray, val imageIndexes: List<Int>)
 
-    fun encodeString(value: String): ByteArray {
+    /**
+     * Caractères FR usuels -> octet pour les pages DOS (CP437/850/858), où é/à/ç… n'ont
+     * PAS la même valeur qu'en Latin-1. Indispensable : beaucoup d'imprimantes ESC/POS
+     * bon marché sont en CP437 (envoyer du Latin-1 donne des accents cassés : é→Θ, à→α…).
+     * Miroir de EscPosTextEncoder.swift (iOS).
+     */
+    private val DOS_FRENCH_ACCENTS = mapOf(
+        0xE9 to 0x82, 0xE8 to 0x8A, 0xEA to 0x88, 0xEB to 0x89, // é è ê ë
+        0xE0 to 0x85, 0xE2 to 0x83, 0xE4 to 0x84,               // à â ä
+        0xE7 to 0x87,                                           // ç
+        0xF9 to 0x97, 0xFB to 0x96, 0xFC to 0x81,               // ù û ü
+        0xEE to 0x8C, 0xEF to 0x8B,                             // î ï
+        0xF4 to 0x93, 0xF6 to 0x94,                             // ô ö
+        0xB0 to 0xF8, 0xAB to 0xAE, 0xBB to 0xAF,               // ° « »
+        0x2014 to 0x2D, 0x2013 to 0x2D, 0x2019 to 0x27,         // — – -> -, ' -> '
+    )
+
+    private fun accentMap(codePage: String): Map<Int, Int> = when (codePage) {
+        "CP858" -> DOS_FRENCH_ACCENTS + (0x20AC to 0xD5) // + €
+        "CP437", "CP850" -> DOS_FRENCH_ACCENTS
+        else -> emptyMap() // WPC1252 / Latin-1 : octet Unicode bas direct
+    }
+
+    /**
+     * Encode une chaîne pour la page de code donnée. Pour WPC1252/Latin-1 : octet bas.
+     * Pour CP437/850/858 : accents FR remappés vers les bons octets (sinon é→Θ sur les
+     * imprimantes en page DOS).
+     */
+    fun encodeString(value: String, codePage: String = "WPC1252"): ByteArray {
+        val map = accentMap(codePage)
         val out = ByteArrayOutputStream()
-        value.codePoints().forEach { cp -> out.write(if (cp <= 0xFF) cp else 0x3F) }
+        value.codePoints().forEach { cp ->
+            val mapped = map[cp]
+            out.write(
+                when {
+                    mapped != null -> mapped
+                    cp <= 0xFF -> cp
+                    else -> 0x3F
+                },
+            )
+        }
         return out.toByteArray()
     }
 
@@ -101,7 +139,7 @@ object EscPosTextEncoder {
             when (item) {
                 is PrintItem.Text -> {
                     openStyle(out, item.style, defaultCodePage)
-                    out.write(encodeString(item.value))
+                    out.write(encodeString(item.value, item.style.codePage ?: defaultCodePage))
                     if (item.style.newline) out.write(LF)
                     reset(out)
                 }

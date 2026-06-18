@@ -76,15 +76,20 @@ class BluetoothSppTransport(
     override fun write(bytes: ByteArray) {
         val o = out ?: throw PrinterException(ErrorCode.CONNECTION_FAILED, "Socket SPP non ouvert")
         try {
+            // Les imprimantes SPP bon marché n'ont PAS de contrôle de flux matériel et un
+            // petit buffer d'entrée. Envoyer un gros raster (image/logo) d'un trait le fait
+            // déborder -> image tronquée ou absente, alors que le texte (petit) passe.
+            // On découpe en petits paquets ET on cadence dès qu'un job dépasse un paquet,
+            // pour laisser l'imprimante drainer. Le BLE n'a pas ce souci (ACK par paquet).
+            val chunk = 512
+            val pace = bytes.size > chunk // gros job (image) -> on cadence
             var offset = 0
-            val chunk = 2048 // les buffers SPP sont petits
             while (offset < bytes.size) {
                 val len = minOf(chunk, bytes.size - offset)
                 o.write(bytes, offset, len)
                 o.flush()
                 offset += len
-                // micro-pause anti-overflow sur imprimantes lentes
-                if (bytes.size > 16_384) Thread.sleep(8)
+                if (pace) Thread.sleep(15)
             }
         } catch (e: Exception) {
             throw PrinterException(ErrorCode.PRINT_FAILED, "Écriture SPP échouée", e.message, retryable = true)
