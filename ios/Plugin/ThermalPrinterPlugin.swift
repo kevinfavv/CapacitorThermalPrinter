@@ -161,6 +161,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
             printerId: call.getString("printerId"),
             filePath: image["filePath"] as? String,
             url: image["url"] as? String,
+            forceFetch: image["forceFetch"] as? Bool ?? false,
             base64: image["base64"] as? String,
             render: render,
             timeoutMs: call.getInt("timeoutMs") ?? 15000,

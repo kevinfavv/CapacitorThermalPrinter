@@ -420,7 +420,7 @@ interface PrintResult {
 type DitheringAlgorithm = 'none' | 'floyd_steinberg' | 'atkinson';
 type ImageAlign = 'left' | 'center' | 'right';
 
-interface ImageSource { filePath?: string; url?: string; base64?: string; } // exactly one key
+interface ImageSource { filePath?: string; url?: string; forceFetch?: boolean; base64?: string; } // exactly one source key; forceFetch only applies to url
 
 interface PrintRenderOptions {
   widthDots?: number;       // otherwise derived from the profile (384/576/832)
@@ -559,6 +559,11 @@ await ThermalPrinter.printImage({ image: { filePath: '/data/user/0/app/files/rec
 await ThermalPrinter.printImage({
   image: { url: 'https://api.example.com/receipts/123/render.png' },
   render: { dithering: 'atkinson', cut: true },
+});
+
+// 2b) Remote URL but bypass the cache (always re-download, then refresh the cache)
+await ThermalPrinter.printImage({
+  image: { url: 'https://api.example.com/receipts/123/render.png', forceFetch: true },
 });
 
 // 3) base64 (handy for tests, less performant)
@@ -745,7 +750,7 @@ catch (e) {
 
 ## Image cache & logs/diagnostics
 
-- **Cache**: `url` images are downloaded into `cache/thermal-images/` (key = URL hash, 32 MB quota, LRU eviction). The `filePath` mode remains the most reliable.
+- **Cache**: `url` images are downloaded into `cache/thermal-images/` (key = URL hash, 32 MB quota, LRU eviction). The `filePath` mode remains the most reliable. Set `image.forceFetch: true` to bypass the cache and always re-download (the fresh file then replaces the cache entry).
 - **Logs**: in-memory ring buffer (500 lines) + Logcat/os_log. Retrievable via `getDebugLog()` for a "Diagnostics" screen attachable to support tickets. Never raw image data (only dimensions/byte counts).
 
 > Implementation status, tests and development setup live in

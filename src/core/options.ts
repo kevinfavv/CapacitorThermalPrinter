@@ -66,6 +66,13 @@ export interface ImageSource {
   filePath?: string;
   /** URL distante. Le plugin télécharge (avec cache). */
   url?: string;
+  /**
+   * Force le re-téléchargement de l'`url` en ignorant le cache local.
+   * Le fichier fraîchement téléchargé remplace l'entrée de cache (les appels
+   * ultérieurs sans `forceFetch` la réutiliseront). Défaut `false`.
+   * Sans effet si la source n'est pas une `url`.
+   */
+  forceFetch?: boolean;
   /** Données base64 (avec ou sans préfixe data:). Pratique en test. */
   base64?: string;
 }

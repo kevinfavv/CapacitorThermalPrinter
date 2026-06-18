@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.1.2]
+
+### Ajouté
+- **`ImageSource.forceFetch` — re-télécharger une image distante sans dépendre du cache.**
+  Quand `printImage({ image: { url, forceFetch: true } })`, le plugin ignore le cache local,
+  re-télécharge toujours l'`url`, puis **remplace** l'entrée de cache (les appels suivants
+  sans `forceFetch` la réutilisent). Sans effet hors source `url`. Défaut `false` (comportement
+  inchangé). Implémenté Android + iOS.
+
 ## [7.1.1]
 
 ### Corrigé

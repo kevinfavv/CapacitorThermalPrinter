@@ -23,11 +23,14 @@ class ImageCache(context: Context) {
 
     private val dir: File = File(context.cacheDir, "thermal-images").apply { mkdirs() }
 
-    /** Télécharge l'URL (si absente du cache) et renvoie le fichier local. */
-    fun fetch(url: String, timeoutMs: Int = 10000): File {
+    /**
+     * Télécharge l'URL (si absente du cache) et renvoie le fichier local.
+     * `forceFetch` ignore le cache : re-télécharge et écrase l'entrée existante.
+     */
+    fun fetch(url: String, timeoutMs: Int = 10000, forceFetch: Boolean = false): File {
         val key = sha1(url)
         val cached = File(dir, "$key.img")
-        if (cached.exists() && cached.length() > 0) {
+        if (!forceFetch && cached.exists() && cached.length() > 0) {
             cached.setLastModified(System.currentTimeMillis())
             Logger.log("image", "cache hit", mapOf("url" to url, "bytes" to cached.length()))
             return cached

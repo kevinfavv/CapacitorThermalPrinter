@@ -218,6 +218,7 @@ class ThermalPrinterPlugin : Plugin() {
             printerId = call.getString("printerId"),
             filePath = image.optString("filePath", null),
             url = image.optString("url", null),
+            forceFetch = image.optBoolean("forceFetch", false),
             base64 = image.optString("base64", null),
             render = render,
             timeoutMs = (call.getInt("timeoutMs")?.toLong()) ?: 15000L,

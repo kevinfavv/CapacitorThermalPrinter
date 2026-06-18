@@ -132,6 +132,7 @@ final class ThermalPrinterEngine {
         let printerId: String?
         let filePath: String?
         let url: String?
+        let forceFetch: Bool
         let base64: String?
         let render: RenderOptions?
         let timeoutMs: Int
@@ -389,7 +390,7 @@ final class ThermalPrinterEngine {
     private func loadImage(_ req: PrintRequest) async throws -> UIImage {
         if let path = req.filePath, !path.isEmpty { return try ImageProcessor.decodeFile(path) }
         if let url = req.url, !url.isEmpty {
-            let local = try await imageCache.fetch(url)
+            let local = try await imageCache.fetch(url, forceFetch: req.forceFetch)
             return try ImageProcessor.decodeFile(local)
         }
         if let b64 = req.base64, !b64.isEmpty { return try ImageProcessor.decodeBase64(b64) }

@@ -217,6 +217,7 @@ class ThermalPrinterEngine(private val context: Context) {
         val printerId: String?,
         val filePath: String?,
         val url: String?,
+        val forceFetch: Boolean = false,
         val base64: String?,
         val render: RenderOptions?,
         val timeoutMs: Long = 15000,
@@ -523,7 +524,7 @@ class ThermalPrinterEngine(private val context: Context) {
 
     private fun loadImage(req: PrintRequest): Bitmap = when {
         !req.filePath.isNullOrBlank() -> ImageProcessor.decodeFile(req.filePath)
-        !req.url.isNullOrBlank() -> ImageProcessor.decodeFile(imageCache.fetch(req.url).absolutePath)
+        !req.url.isNullOrBlank() -> ImageProcessor.decodeFile(imageCache.fetch(req.url, forceFetch = req.forceFetch).absolutePath)
         !req.base64.isNullOrBlank() -> ImageProcessor.decodeBase64(req.base64)
         else -> throw PrinterException(ErrorCode.IMAGE_INVALID, "Aucune source image fournie")
     }

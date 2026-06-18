@@ -15,12 +15,13 @@ final class ImageCache {
     }
 
     /// Télécharge l'URL (si absente) et renvoie le chemin local.
-    func fetch(_ urlString: String, timeoutMs: Int = 10000) async throws -> String {
+    /// `forceFetch` ignore le cache : re-télécharge et écrase l'entrée existante.
+    func fetch(_ urlString: String, timeoutMs: Int = 10000, forceFetch: Bool = false) async throws -> String {
         guard let url = URL(string: urlString) else {
             throw PrinterError(.IMAGE_INVALID, "URL invalide: \(urlString)")
         }
         let dest = dir.appendingPathComponent(sha256(urlString) + ".img")
-        if FileManager.default.fileExists(atPath: dest.path) {
+        if !forceFetch, FileManager.default.fileExists(atPath: dest.path) {
             Logger.shared.log("image", "cache hit", ["url": urlString])
             return dest.path
         }
