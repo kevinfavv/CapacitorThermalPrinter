@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.1.1]
+
+### Corrigé
+- **Image agrandie puis coupée (escpos/BLE sur imprimante 58 mm).** `resizeToWidth`
+  **agrandissait** une image plus étroite que la largeur cible (ex. reçu déjà rendu à
+  384 px/58 mm gonflé à 576 px car le BLE assume 80 mm par défaut, largeur non détectable) :
+  l'imprimante 58 mm (384 dots) coupait alors la partie droite. Le resize **ne fait plus
+  d'agrandissement** — il imprime au pixel natif (1 px = 1 dot) et ne réduit que si l'image
+  dépasse la cible. Corrigé Android + iOS.
+
 ## [7.1.0]
 
 ### Ajouté

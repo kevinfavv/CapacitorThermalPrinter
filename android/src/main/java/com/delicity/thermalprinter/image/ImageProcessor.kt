@@ -66,9 +66,16 @@ object ImageProcessor {
     // 2 + 3. Resize sur fond blanc
     // ---------------------------------------------------------------------
 
-    /** Redimensionne à [targetWidth] px, hauteur proportionnelle, fond blanc opaque. */
+    /**
+     * Redimensionne à [targetWidth] px (hauteur proportionnelle, fond blanc opaque), SANS
+     * jamais agrandir : on imprime au pixel natif (1 px = 1 dot) et on réduit seulement si
+     * l'image dépasse la largeur cible. Agrandir flouterait le raster ET — si la largeur
+     * supposée dépasse le papier réel (ex. BLE par défaut 80 mm/576 px sur une imprimante
+     * 58 mm/384 px) — ferait déborder l'image qui serait coupée à droite par l'imprimante.
+     * La largeur effective est donc bornée à la largeur source.
+     */
     fun resizeToWidth(src: Bitmap, targetWidth: Int): Bitmap {
-        val w = targetWidth.coerceAtLeast(8)
+        val w = targetWidth.coerceAtLeast(8).coerceAtMost(src.width)
         val ratio = w.toDouble() / src.width.toDouble()
         var h = Math.round(src.height * ratio).toInt().coerceAtLeast(1)
         if (h > MAX_HEIGHT) {

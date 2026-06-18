@@ -33,9 +33,15 @@ enum ImageProcessor {
     // MARK: - Resize sur fond blanc
 
     static func resizeToWidth(_ image: UIImage, targetWidth: Int) throws -> UIImage {
-        let w = max(8, targetWidth)
-        let ratio = CGFloat(w) / image.size.width
-        let h = Int((image.size.height * ratio).rounded())
+        // Ne jamais AGRANDIR (cf. Android) : on imprime au pixel natif et on réduit seulement
+        // si l'image dépasse la largeur cible. Agrandir flouterait le raster ET, si la largeur
+        // supposée dépasse le papier réel (BLE défaut 80mm/576px sur une 58mm/384px), ferait
+        // déborder l'image (coupée à droite). On borne la largeur effective à la source (px).
+        let srcW = image.cgImage?.width ?? Int(image.size.width.rounded())
+        let srcH = image.cgImage?.height ?? Int(image.size.height.rounded())
+        let w = min(max(8, targetWidth), max(1, srcW))
+        let ratio = CGFloat(w) / CGFloat(max(1, srcW))
+        let h = max(1, Int((CGFloat(srcH) * ratio).rounded()))
         guard h <= MAX_HEIGHT else {
             throw PrinterError(.IMAGE_TOO_LARGE, "Image trop haute: \(h)px (max \(MAX_HEIGHT))")
         }
