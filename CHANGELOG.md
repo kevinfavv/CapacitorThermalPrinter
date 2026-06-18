@@ -4,6 +4,25 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.0.6]
+
+### Corrigé
+- **Android — crash fatal pendant la découverte Zebra Bluetooth.** `ZebraAdapter`
+  lisait l'adresse via `getAddress()` en réflexion, mais `DiscoveredPrinter` l'expose
+  en **champ public `address`** (pas de getter) ; `SdkReflect.call` levait alors
+  `NoSuchMethodException`, et comme le callback s'exécute dans le `BroadcastReceiver`
+  de découverte du SDK Zebra, l'exception faisait planter l'app
+  (`UndeclaredThrowableException`). Ajout de `SdkReflect.callOrNull` (renvoie `null`
+  au lieu de lever) pour que le fallback getter→champ fonctionne, et durcissement de
+  `SdkReflect.proxy` : une exception dans un callback de SDK ne peut plus crasher
+  l'app hôte.
+
+### Documentation
+- `docs/SDK_INTEGRATION.md` : procédures d'installation Android détaillées et
+  vérifiées (Brother `.aar` double-dézippage, Epson `ePOS2.jar` + `.so` dans
+  `jniLibs/`, Zebra Link-OS — tous les jars `lib/` + bloc `packaging` anti-collision
+  `META-INF/DEPENDENCIES`), section ProGuard/R8 vulgarisée.
+
 ## [Non publié]
 
 ### Ajouté

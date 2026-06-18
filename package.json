@@ -1,6 +1,6 @@
 {
   "name": "@delicity/capacitor-thermal-printer",
-  "version": "7.0.5",
+  "version": "7.0.6",
   "description": "@delicity/capacitor-thermal-printer — multi-brand thermal/receipt/label printing for Capacitor 7 (ESC/POS, Epson, Star, Brother, Zebra), image-based, with aggregated discovery and automatic reconnection.",
   "main": "dist/plugin.cjs.js",
   "module": "dist/esm/index.js",

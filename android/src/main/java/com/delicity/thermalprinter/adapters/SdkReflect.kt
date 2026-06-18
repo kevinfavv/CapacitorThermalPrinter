@@ -38,6 +38,17 @@ object SdkReflect {
     fun call(target: Any, method: String, paramTypes: Array<Class<*>> = emptyArray(), args: Array<Any?> = emptyArray()): Any? =
         target.javaClass.getMethod(method, *paramTypes).invoke(target, *args)
 
+    /**
+     * Comme [call], mais renvoie `null` si la méthode n'existe pas / échoue, au lieu de
+     * lever (ex. `NoSuchMethodException`). Utile pour un fallback getter -> champ public :
+     * `callOrNull(x, "getFoo") ?: field(x, "foo")`.
+     */
+    fun callOrNull(target: Any, method: String, paramTypes: Array<Class<*>> = emptyArray(), args: Array<Any?> = emptyArray()): Any? = try {
+        call(target, method, paramTypes, args)
+    } catch (e: Throwable) {
+        null
+    }
+
     /** Appelle une méthode statique. */
     fun callStatic(className: String, method: String, paramTypes: Array<Class<*>> = emptyArray(), args: Array<Any?> = emptyArray()): Any? {
         val c = classOrNull(className) ?: error("Classe absente: $className")
@@ -87,7 +98,16 @@ object SdkReflect {
         return Proxy.newProxyInstance(iface.classLoader, arrayOf(iface), object : InvocationHandler {
             override fun invoke(proxy: Any?, method: Method, args: Array<out Any?>?): Any? {
                 val a = (args ?: emptyArray()).map { it }.toTypedArray()
-                return handlers[method.name]?.invoke(a) ?: defaultFor(method.returnType)
+                val handler = handlers[method.name] ?: return defaultFor(method.returnType)
+                // Ces callbacks sont invoqués DANS le SDK (ex. BroadcastReceiver de découverte
+                // Bluetooth Zebra). Une exception qui remonte ici devient une
+                // UndeclaredThrowableException et CRASHE l'app hôte. On l'absorbe : un échec
+                // de découverte ne doit jamais faire planter l'app.
+                return try {
+                    handler.invoke(a) ?: defaultFor(method.returnType)
+                } catch (e: Throwable) {
+                    defaultFor(method.returnType)
+                }
             }
         })
     }

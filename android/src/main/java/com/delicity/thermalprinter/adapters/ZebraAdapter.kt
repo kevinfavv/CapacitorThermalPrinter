@@ -41,7 +41,10 @@ class ZebraAdapter(private val context: Context) : PrinterAdapter {
             "foundPrinter" to { args ->
                 val dp = args.getOrNull(0)
                 if (dp != null) {
-                    val address = SdkReflect.call(dp, "getAddress") as? String
+                    // DiscoveredPrinter expose l'adresse en CHAMP public `address` (pas de
+                    // getter getAddress()). callOrNull tente quand même un getter (autres
+                    // versions de SDK), sinon on lit le champ — sans lever.
+                    val address = SdkReflect.callOrNull(dp, "getAddress") as? String
                         ?: SdkReflect.field(dp, "address") as? String ?: ""
                     if (address.isNotEmpty()) {
                         onFound(
