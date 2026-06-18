@@ -235,7 +235,8 @@ class ThermalPrinterPlugin : Plugin() {
         val req = ThermalPrinterEngine.PrintTextRequest(
             printerId = call.getString("printerId"),
             items = items,
-            defaultCodePage = call.getString("defaultCodePage") ?: "WPC1252",
+            // `encoding` (préféré, latin OU CJK) ; `defaultCodePage` = alias historique.
+            defaultCodePage = call.getString("encoding") ?: call.getString("defaultCodePage") ?: "WPC1252",
             cut = call.getBoolean("cut", false) ?: false,
             feedLines = call.getInt("feedLines") ?: 3,
             timeoutMs = (call.getInt("timeoutMs")?.toLong()) ?: 15000L,

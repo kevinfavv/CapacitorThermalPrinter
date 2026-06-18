@@ -23,11 +23,26 @@ export type Underline = 'none' | 'single' | 'double';
 export type EscPosFont = 'A' | 'B';
 
 /**
- * Page de code pour les caractères accentués. Le défaut `WPC1252`
+ * Page de code MONO-OCTET pour les caractères latins/accentués. Le défaut `WPC1252`
  * (Windows-1252) couvre le français. La valeur ESC t exacte est résolue par
  * `CODE_PAGE_TO_ESC_T` (surclassable via `codePageId`).
  */
 export type CodePage = 'CP437' | 'CP850' | 'CP858' | 'WPC1252' | 'CP852' | 'CP866';
+
+/**
+ * Encodages MULTI-OCTETS (CJK) : pour imprimer du chinois / japonais / coréen. Le plugin
+ * sélectionne alors le mode idéogrammes de l'imprimante (FS &) et encode le texte dans le
+ * charset natif. Géré côté natif (Android/iOS) ; non rendu par l'encodeur web de référence.
+ */
+export type CjkEncoding = 'GB18030' | 'GBK' | 'Shift_JIS' | 'EUC-KR' | 'Big5';
+
+/**
+ * Encodage du texte : page de code latine (défaut `WPC1252`, accents FR) OU charset CJK
+ * (`GB18030`…) pour ne pas bloquer les langues idéographiques. Configurable par le dev au
+ * niveau connexion (`ConnectOptions.encoding`), par appel (`PrintTextOptions.encoding`) ou
+ * par item (`TextStyle.encoding`) ; le plus précis l'emporte. Défaut : `WPC1252`.
+ */
+export type TextEncoding = CodePage | CjkEncoding;
 
 /** Symbologies code-barres ESC/POS (GS k). */
 export type BarcodeSymbology =
@@ -75,9 +90,14 @@ export interface TextStyle {
   letterSpacing?: number;
   /** Interligne en points (ESC 3 n). `undefined` = interligne par défaut (ESC 2). */
   lineSpacing?: number;
-  /** Page de code pour les accents. Défaut hérité des options globales. */
+  /**
+   * Encodage du texte pour CET item : page de code latine (`CP437`, `WPC1252`…) ou charset
+   * CJK (`GB18030`…). Prioritaire sur l'encodage du job/de la connexion. Défaut hérité.
+   */
+  encoding?: TextEncoding;
+  /** @deprecated Alias historique de `encoding` (mono-octet uniquement). */
   codePage?: CodePage;
-  /** Override numérique brut de la commande ESC t (priorité sur codePage). */
+  /** Override numérique brut de la commande ESC t (priorité sur encoding ; latin uniquement). */
   codePageId?: number;
   /** Ajoute un saut de ligne (LF) après le texte. Défaut `true`. */
   newline?: boolean;

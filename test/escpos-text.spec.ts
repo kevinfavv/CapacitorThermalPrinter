@@ -92,8 +92,21 @@ describe('openStyle', () => {
 });
 
 describe('resetStyle', () => {
-  it('émet ESC @ + FS . (annule le mode CJK double-octet)', () => {
-    expect(resetStyle()).toEqual([ESC, 0x40, 0x1c, 0x2e]);
+  it('émet ESC @', () => {
+    expect(resetStyle()).toEqual([ESC, 0x40]);
+  });
+});
+
+describe('openStyle (encodage)', () => {
+  it('latin : FS . (annule CJK) puis ESC t (page de code)', () => {
+    const s = openStyle({}, { encoding: 'CP437' }).join(',');
+    expect(s).toContain([0x1c, 0x2e].join(',')); // FS .
+    expect(s).toContain([ESC, 0x74, 0].join(',')); // ESC t 0 (CP437)
+  });
+  it('CJK : FS & (mode idéogrammes) et PAS de ESC t', () => {
+    const s = openStyle({ encoding: 'GB18030' }).join(',');
+    expect(s).toContain([0x1c, 0x26].join(',')); // FS &
+    expect(s).not.toContain([ESC, 0x74].join(',')); // pas de page de code latine
   });
 });
 
@@ -165,8 +178,8 @@ describe('encodeEscPosItems (intégration)', () => {
 
   it('respecte newline:false (pas de LF ajouté)', () => {
     const { bytes } = encodeEscPosItems([{ type: 'text', value: 'X', style: { newline: false } }]);
-    // se termine par le reset ESC @ + FS . (dernier octet 0x2e), pas un LF
-    expect(bytes[bytes.length - 1]).toBe(0x2e);
+    // chaque item se termine par le reset ESC @ (dernier octet 0x40), pas un LF
+    expect(bytes[bytes.length - 1]).toBe(0x40);
     expect(bytes).not.toContain(0x0a);
   });
 

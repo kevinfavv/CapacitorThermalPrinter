@@ -132,7 +132,13 @@ export interface PrintTextOptions {
   printerId?: string;
   /** Liste ordonnée d'items à imprimer (texte stylé, QR, code-barres, feed, cut...). */
   items: import('./text').PrintItem[];
-  /** Page de code par défaut pour les accents (français : 'WPC1252'). */
+  /**
+   * Encodage du texte par défaut pour ce job : page de code latine (`WPC1252` = français,
+   * `CP437`…) ou charset CJK (`GB18030`…) pour le chinois/japonais/coréen. Surclassable par
+   * item via `TextStyle.encoding`. Défaut : encodage de la connexion sinon `WPC1252`.
+   */
+  encoding?: import('./text').TextEncoding;
+  /** @deprecated Alias historique de `encoding` (mono-octet uniquement). */
   defaultCodePage?: import('./text').CodePage;
   /** Couper le papier en fin de job (si non géré par un item `cut`). Défaut false. */
   cut?: boolean;

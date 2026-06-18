@@ -5,11 +5,29 @@ enum EscPosTextEncoder {
 
     private static let ESC: UInt8 = 0x1B
     private static let GS: UInt8 = 0x1D
+    private static let FS: UInt8 = 0x1C
     private static let LF: UInt8 = 0x0A
 
     private static let codePageToEscT: [String: UInt8] = [
         "CP437": 0, "CP850": 2, "CP858": 19, "WPC1252": 16, "CP852": 18, "CP866": 17,
     ]
+
+    /// Encodages MULTI-OCTETS (CJK) -> `String.Encoding`. Pour ceux-ci on sélectionne le mode
+    /// idéogrammes de l'imprimante (FS &) et on encode dans le charset natif, au lieu du
+    /// mono-octet + page de code latine. Permet d'imprimer chinois/japonais/coréen.
+    private static func cjkEncoding(_ name: String) -> String.Encoding? {
+        func cf(_ e: CFStringEncodings) -> String.Encoding {
+            String.Encoding(rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(e.rawValue)))
+        }
+        switch name {
+        case "Shift_JIS": return .shiftJIS
+        case "GB18030": return cf(.GB_18030_2000)
+        case "GBK": return cf(.GB_18030_2000) // GBK ⊂ GB18030
+        case "EUC-KR": return cf(.EUC_KR)
+        case "Big5": return cf(.big5)
+        default: return nil
+        }
+    }
     private static let barcodeM: [String: UInt8] = [
         "UPC_A": 65, "UPC_E": 66, "EAN13": 67, "EAN8": 68,
         "CODE39": 69, "ITF": 70, "CODABAR": 71, "CODE93": 72, "CODE128": 73,
@@ -39,9 +57,15 @@ enum EscPosTextEncoder {
         }
     }
 
-    /// Encode une chaîne pour la page de code donnée. Pour WPC1252/Latin-1 : octet bas.
-    /// Pour CP437/850/858 : accents FR remappés vers les bons octets.
+    /// Encode une chaîne pour l'encodage donné :
+    ///  - CJK (GB18030/GBK/Shift_JIS/EUC-KR/Big5) : encodage multi-octets via le charset natif.
+    ///  - CP437/850/858 : accents FR remappés vers les bons octets DOS.
+    ///  - WPC1252/Latin-1 (défaut) : octet bas direct ; hors plage -> '?'.
     static func encodeString(_ value: String, codePage: String = "WPC1252") -> [UInt8] {
+        if let enc = cjkEncoding(codePage) {
+            if let data = value.data(using: enc) { return [UInt8](data) }
+            return [UInt8](value.utf8) // dernier recours
+        }
         let map = accentMap(codePage)
         return value.unicodeScalars.map { sc in
             if let b = map[sc.value] { return b }
@@ -56,8 +80,16 @@ enum EscPosTextEncoder {
     }
 
     private static func openStyle(_ out: inout [UInt8], _ s: TextStyle, _ defaultCodePage: String) {
-        let cp = s.codePageId.map { UInt8(truncatingIfNeeded: $0) } ?? (codePageToEscT[s.codePage ?? defaultCodePage] ?? 16)
-        out += [ESC, 0x74, cp]
+        let enc = s.codePage ?? defaultCodePage
+        if cjkEncoding(enc) != nil {
+            // Mode idéogrammes (chinois/japonais/coréen) : FS & sélectionne le double-octet.
+            out += [FS, 0x26]
+        } else {
+            // Latin : FS . annule un éventuel mode CJK -> mono-octet, puis ESC t (page de code).
+            out += [FS, 0x2E]
+            let cp = s.codePageId.map { UInt8(truncatingIfNeeded: $0) } ?? (codePageToEscT[enc] ?? 16)
+            out += [ESC, 0x74, cp]
+        }
         let align: UInt8 = s.align == "center" ? 1 : (s.align == "right" ? 2 : 0)
         out += [ESC, 0x61, align]
         out += [ESC, 0x4D, s.font == "B" ? 1 : 0]

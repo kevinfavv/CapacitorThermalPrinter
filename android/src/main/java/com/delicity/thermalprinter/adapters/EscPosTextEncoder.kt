@@ -16,11 +16,25 @@ object EscPosTextEncoder {
 
     private const val ESC = 0x1B
     private const val GS = 0x1D
+    private const val FS = 0x1C
     private const val LF = 0x0A
 
     private val CODE_PAGE_TO_ESC_T = mapOf(
         "CP437" to 0, "CP850" to 2, "CP858" to 19, "WPC1252" to 16, "CP852" to 18, "CP866" to 17,
     )
+
+    /**
+     * Encodages MULTI-OCTETS (CJK) : nom d'encodage public -> charset JVM. Pour ceux-ci on
+     * sélectionne le mode idéogrammes de l'imprimante (FS &) et on encode la chaîne dans le
+     * charset natif (au lieu du mono-octet + page de code latine). Permet aux apps d'imprimer
+     * du chinois/japonais/coréen sans être bloquées par l'abstraction latine par défaut.
+     */
+    private val CJK_CHARSET = mapOf(
+        "GB18030" to "GB18030", "GBK" to "GBK", "Shift_JIS" to "Shift_JIS",
+        "EUC-KR" to "EUC-KR", "Big5" to "Big5",
+    )
+
+    private fun isCjk(encoding: String): Boolean = CJK_CHARSET.containsKey(encoding)
 
     private val BARCODE_M = mapOf(
         "UPC_A" to 65, "UPC_E" to 66, "EAN13" to 67, "EAN8" to 68,
@@ -53,12 +67,17 @@ object EscPosTextEncoder {
     }
 
     /**
-     * Encode une chaîne pour la page de code donnée. Pour WPC1252/Latin-1 : octet bas.
-     * Pour CP437/850/858 : accents FR remappés vers les bons octets (sinon é→Θ sur les
-     * imprimantes en page DOS).
+     * Encode une chaîne pour l'encodage donné :
+     *  - CJK (GB18030/GBK/Shift_JIS/EUC-KR/Big5) : encodage multi-octets via le charset JVM.
+     *  - CP437/850/858 : accents FR remappés vers les bons octets DOS (sinon é→Θ).
+     *  - WPC1252/Latin-1 (défaut) : octet bas direct ; hors plage -> '?'.
      */
-    fun encodeString(value: String, codePage: String = "WPC1252"): ByteArray {
-        val map = accentMap(codePage)
+    fun encodeString(value: String, encoding: String = "WPC1252"): ByteArray {
+        CJK_CHARSET[encoding]?.let { cs ->
+            return runCatching { value.toByteArray(java.nio.charset.Charset.forName(cs)) }
+                .getOrElse { value.toByteArray(Charsets.UTF_8) }
+        }
+        val map = accentMap(encoding)
         val out = ByteArrayOutputStream()
         value.codePoints().forEach { cp ->
             val mapped = map[cp]
@@ -80,8 +99,17 @@ object EscPosTextEncoder {
     }
 
     private fun openStyle(out: ByteArrayOutputStream, s: TextStyle, defaultCodePage: String) {
-        val cp = s.codePageId ?: (CODE_PAGE_TO_ESC_T[s.codePage ?: defaultCodePage] ?: 16)
-        out.write(byteArrayOf(ESC.toByte(), 0x74, (cp and 0xFF).toByte()))
+        val enc = s.codePage ?: defaultCodePage
+        if (isCjk(enc)) {
+            // Mode idéogrammes (chinois/japonais/coréen) : FS & sélectionne le double-octet.
+            out.write(byteArrayOf(FS.toByte(), 0x26))
+        } else {
+            // Latin : FS . annule un éventuel mode CJK (imprimantes chinoises) -> mono-octet,
+            // puis ESC t sélectionne la page de code. (codePageId surcharge la page.)
+            out.write(byteArrayOf(FS.toByte(), 0x2E))
+            val cp = s.codePageId ?: (CODE_PAGE_TO_ESC_T[enc] ?: 16)
+            out.write(byteArrayOf(ESC.toByte(), 0x74, (cp and 0xFF).toByte()))
+        }
         val align = when (s.align) { "center" -> 1; "right" -> 2; else -> 0 }
         out.write(byteArrayOf(ESC.toByte(), 0x61, align.toByte()))
         out.write(byteArrayOf(ESC.toByte(), 0x4D, if (s.font == "B") 1 else 0))
@@ -98,11 +126,9 @@ object EscPosTextEncoder {
         else out.write(byteArrayOf(ESC.toByte(), 0x32))
     }
 
-    // ESC @ (réinit) + FS . (annule le mode caractères chinois/Kanji double-octet). Sans
-    // FS ., les imprimantes "génériques" chinoises en mode CJK avalent les octets ≥0x80 par
-    // paires (accents -> idéogrammes, ex. "éàçùê" -> "獣琦") et IGNORENT la page de code
-    // (ESC t). ESC @ pouvant restaurer le mode CJK par défaut, on renvoie FS . à chaque reset.
-    private fun reset(out: ByteArrayOutputStream) = out.write(byteArrayOf(ESC.toByte(), 0x40, 0x1C, 0x2E))
+    // ESC @ : réinitialise styles + état. Le mode caractères (FS . latin / FS & CJK) est
+    // (re)sélectionné par openStyle() avant chaque texte selon l'encodage demandé.
+    private fun reset(out: ByteArrayOutputStream) = out.write(byteArrayOf(ESC.toByte(), 0x40))
 
     private fun qrCode(out: ByteArrayOutputStream, item: PrintItem.QrCode) {
         val align = when (item.align) { "left" -> 0; "right" -> 2; else -> 1 }

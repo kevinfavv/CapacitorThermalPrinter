@@ -40,7 +40,8 @@ data class TextStyle(
                 rotate90 = o.optBoolean("rotate90", false),
                 letterSpacing = if (o.has("letterSpacing")) o.optInt("letterSpacing") else null,
                 lineSpacing = if (o.has("lineSpacing")) o.optInt("lineSpacing") else null,
-                codePage = o.optString("codePage").ifEmpty { null },
+                // `encoding` (préféré, latin OU CJK) ; `codePage` = alias historique latin.
+                codePage = o.optString("encoding").ifEmpty { null } ?: o.optString("codePage").ifEmpty { null },
                 codePageId = if (o.has("codePageId")) o.optInt("codePageId") else null,
                 newline = o.optBoolean("newline", true),
             )

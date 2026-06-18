@@ -34,7 +34,8 @@ struct TextStyle {
         s.rotate90 = d["rotate90"] as? Bool ?? false
         s.letterSpacing = d["letterSpacing"] as? Int
         s.lineSpacing = d["lineSpacing"] as? Int
-        s.codePage = d["codePage"] as? String
+        // `encoding` (préféré, latin OU CJK) ; `codePage` = alias historique latin.
+        s.codePage = (d["encoding"] as? String) ?? (d["codePage"] as? String)
         s.codePageId = d["codePageId"] as? Int
         s.newline = d["newline"] as? Bool ?? true
         return s

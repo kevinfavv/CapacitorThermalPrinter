@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.1.0]
+
+### Ajouté
+- **Encodage texte configurable par le dev — y compris CJK (chinois/japonais/coréen).**
+  Nouveau type `TextEncoding` = page de code latine (`WPC1252` défaut FR, `CP437`…) **ou**
+  charset multi-octets (`GB18030`, `GBK`, `Shift_JIS`, `EUC-KR`, `Big5`). Configurable par
+  job (`PrintTextOptions.encoding`) ou par item (`TextStyle.encoding`). `defaultCodePage` /
+  `codePage` restent acceptés comme **alias** (latin). Les langues idéographiques ne sont
+  donc plus bloquées par l'abstraction latine.
+  - Latin : `FS .` (annule le mode CJK) + `ESC t` (page de code) + remap d'accents.
+  - CJK : `FS &` (mode idéogrammes) + encodage natif dans le charset (Android `Charset`,
+    iOS `CFStringEncoding`). L'encodeur web de référence reste latin (CJK = natif only).
+
+### Modifié
+- **`FS .` n'est plus émis inconditionnellement** (v7.0.8) mais **selon l'encodage** : latin
+  → `FS .`, CJK → `FS &`. Émis par `openStyle` avant chaque texte (au lieu du reset).
+
 ## [7.0.9]
 
 ### Corrigé

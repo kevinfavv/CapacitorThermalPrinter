@@ -181,8 +181,9 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
             items: PrintItem.parseList(rawItems),
             // Défaut CP437 : page de code par défaut de la quasi-totalité des imprimantes
             // ESC/POS (les WPC1252 sont rares) -> accents FR corrects sans config. L'app
-            // peut surcharger via defaultCodePage / le style d'item.
-            defaultCodePage: call.getString("defaultCodePage") ?? "CP437",
+            // peut surcharger via encoding / le style d'item.
+            // `encoding` (préféré, latin OU CJK) ; `defaultCodePage` = alias historique.
+            defaultCodePage: call.getString("encoding") ?? call.getString("defaultCodePage") ?? "CP437",
             cut: call.getBool("cut") ?? false,
             feedLines: call.getInt("feedLines") ?? 3,
             timeoutMs: call.getInt("timeoutMs") ?? 15000,

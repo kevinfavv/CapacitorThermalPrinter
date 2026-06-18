@@ -66,6 +66,31 @@ class EscPosTextEncoderTest {
     }
 
     @Test
+    fun `encodeString CJK encode en multi-octets via le charset`() {
+        // 中 (U+4E2D) en GB18030 = 0xD6 0xD0 (double-octet), pas '?'.
+        assertEquals(listOf(0xD6, 0xD0), EscPosTextEncoder.encodeString("中", "GB18030").map { it.toInt() and 0xFF })
+        // ASCII reste mono-octet même en CJK.
+        assertEquals(listOf(0x41), EscPosTextEncoder.encodeString("A", "GBK").map { it.toInt() and 0xFF })
+    }
+
+    @Test
+    fun `encode CJK selectionne le mode ideogrammes (FS et) sans ESC t`() {
+        val b = bytes(listOf(PrintItem.Text("中", TextStyle(codePage = "GB18030"))))
+        val s = b.joinToString(",")
+        assertTrue(s.contains("28,38")) // FS & (sélection mode CJK)
+        assertTrue(!s.contains("27,116")) // PAS de ESC t (pas de page de code latine)
+        assertTrue(s.contains("214,208")) // 中 en GB18030 (0xD6,0xD0)
+    }
+
+    @Test
+    fun `encode latin annule le mode CJK (FS point) avant ESC t`() {
+        val b = bytes(listOf(PrintItem.Text("e", TextStyle())))
+        val s = b.joinToString(",")
+        assertTrue(s.contains("28,46")) // FS . (annule CJK)
+        assertTrue(s.contains("27,116")) // ESC t (page de code)
+    }
+
+    @Test
     fun `texte gras centre taille x2 emet les bonnes commandes`() {
         val b = bytes(listOf(PrintItem.Text("X", TextStyle(align = "center", bold = true, widthMultiplier = 2, heightMultiplier = 2))))
         val s = b.joinToString(",")

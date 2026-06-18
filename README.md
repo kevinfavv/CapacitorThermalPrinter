@@ -471,7 +471,9 @@ interface PrintJobStatusEvent { job: PrintJobStatus; }
 type TextAlign = 'left' | 'center' | 'right';
 type Underline = 'none' | 'single' | 'double';
 type EscPosFont = 'A' | 'B';
-type CodePage = 'CP437' | 'CP850' | 'CP858' | 'WPC1252' | 'CP852' | 'CP866'; // Latin-1/Western: WPC1252
+type CodePage = 'CP437' | 'CP850' | 'CP858' | 'WPC1252' | 'CP852' | 'CP866'; // Latin/Western: WPC1252
+type CjkEncoding = 'GB18030' | 'GBK' | 'Shift_JIS' | 'EUC-KR' | 'Big5';       // Chinese/Japanese/Korean
+type TextEncoding = CodePage | CjkEncoding; // default 'WPC1252' (French/Latin). CJK -> printer FS & mode (native)
 type BarcodeSymbology = 'UPC_A'|'UPC_E'|'EAN13'|'EAN8'|'CODE39'|'ITF'|'CODABAR'|'CODE93'|'CODE128';
 type HriPosition = 'none' | 'above' | 'below' | 'both';
 type QrErrorCorrection = 'L' | 'M' | 'Q' | 'H';
@@ -489,8 +491,9 @@ interface TextStyle {
   rotate90?: boolean;
   letterSpacing?: number;     // dots
   lineSpacing?: number;       // dots (otherwise default)
-  codePage?: CodePage;
-  codePageId?: number;        // raw ESC t n override
+  encoding?: TextEncoding;    // per-item encoding (Latin page or CJK charset)
+  codePage?: CodePage;        // deprecated alias of `encoding` (Latin only)
+  codePageId?: number;        // raw ESC t n override (Latin only)
   newline?: boolean;          // default true
 }
 
@@ -508,7 +511,8 @@ type PrintItem =
 interface PrintTextOptions {
   printerId?: string;
   items: PrintItem[];
-  defaultCodePage?: CodePage; // Western/Latin-1: 'WPC1252'
+  encoding?: TextEncoding;    // text encoding: Latin page ('WPC1252' default) or CJK ('GB18030'…)
+  defaultCodePage?: CodePage; // deprecated alias of `encoding` (Latin only)
   cut?: boolean;              // default false
   feedLines?: number;         // default 3
   timeoutMs?: number;

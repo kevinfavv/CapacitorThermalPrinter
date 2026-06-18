@@ -5,6 +5,7 @@ import {
   type CodePage,
   type PrintItem,
   type QrCodeItem,
+  type TextEncoding,
   type TextStyle,
 } from './text';
 
@@ -24,10 +25,19 @@ import {
 
 const ESC = 0x1b;
 const GS = 0x1d;
+const FS = 0x1c;
 const LF = 0x0a;
 
+/** Encodages multi-octets (CJK) : sélectionnent le mode idéogrammes (FS &) au lieu du latin. */
+const CJK_ENCODINGS = new Set<string>(['GB18030', 'GBK', 'Shift_JIS', 'EUC-KR', 'Big5']);
+function isCjk(encoding: string): boolean {
+  return CJK_ENCODINGS.has(encoding);
+}
+
 export interface EscPosTextOptions {
-  /** Page de code par défaut (français : 'WPC1252'). */
+  /** Encodage par défaut : page latine (`WPC1252`…) ou charset CJK (`GB18030`…). */
+  encoding?: TextEncoding;
+  /** @deprecated Alias historique de `encoding` (mono-octet uniquement). */
   defaultCodePage?: CodePage;
   /** Nb de colonnes en police A (déduit largeur). Défaut 48 (80mm) / 32 (58mm). */
   columns?: number;
@@ -62,8 +72,8 @@ const DOS_FRENCH_ACCENTS: Record<number, number> = {
   0x2014: 0x2d, 0x2013: 0x2d, 0x2019: 0x27, // — – -> -, ' -> '
 };
 
-function accentMap(codePage: CodePage): Record<number, number> {
-  switch (codePage) {
+function accentMap(encoding: TextEncoding): Record<number, number> {
+  switch (encoding) {
     case 'CP858':
       return { ...DOS_FRENCH_ACCENTS, 0x20ac: 0xd5 }; // + €
     case 'CP437':
@@ -75,13 +85,17 @@ function accentMap(codePage: CodePage): Record<number, number> {
 }
 
 /**
- * Encode une chaîne vers une page de code mono-octet.
+ * Encode une chaîne vers un flux d'octets pour l'encodage donné (mono-octet latin).
  * Pour WPC1252/Latin-1, le code-point Unicode == octet pour 0x00..0xFF (couvre FR).
- * Pour CP437/850/858, les accents FR sont remappés vers les bons octets DOS (sinon é→Θ
- * sur les imprimantes en page DOS). Les caractères hors plage sont remplacés par '?'.
+ * Pour CP437/850/858, les accents FR sont remappés vers les bons octets DOS (sinon é→Θ).
+ * Les caractères hors plage sont remplacés par '?'.
+ *
+ * ⚠️ Encodages CJK (`GB18030`…) : l'encodage multi-octets est fait CÔTÉ NATIF (Android/iOS).
+ * Cet encodeur de référence (web/tests) ne sait pas produire ces octets : les idéogrammes
+ * deviennent '?'. La sélection du mode imprimante (FS &) est en revanche bien émise.
  */
-export function encodeString(value: string, codePage: CodePage = 'WPC1252'): number[] {
-  const map = accentMap(codePage);
+export function encodeString(value: string, encoding: TextEncoding = 'WPC1252'): number[] {
+  const map = accentMap(encoding);
   const bytes: number[] = [];
   for (const ch of value) {
     const cp = ch.codePointAt(0) ?? 0x3f;
@@ -102,9 +116,15 @@ export function sizeByte(widthMultiplier = 1, heightMultiplier = 1): number {
 export function openStyle(style: TextStyle = {}, opts: EscPosTextOptions = {}): number[] {
   const cmds: number[][] = [];
 
-  // Page de code (accents)
-  const cp = style.codePageId ?? CODE_PAGE_TO_ESC_T[style.codePage ?? opts.defaultCodePage ?? 'WPC1252'];
-  cmds.push([ESC, 0x74, cp & 0xff]); // ESC t n
+  // Encodage : CJK -> mode idéogrammes (FS &) ; latin -> annule CJK (FS .) + page de code (ESC t).
+  const enc: TextEncoding = style.encoding ?? style.codePage ?? opts.encoding ?? opts.defaultCodePage ?? 'WPC1252';
+  if (isCjk(enc)) {
+    cmds.push([FS, 0x26]); // FS & : sélection mode CJK
+  } else {
+    cmds.push([FS, 0x2e]); // FS . : annule un éventuel mode CJK -> mono-octet
+    const cp = style.codePageId ?? CODE_PAGE_TO_ESC_T[enc as CodePage] ?? 16;
+    cmds.push([ESC, 0x74, cp & 0xff]); // ESC t n
+  }
 
   // Alignement (ESC a n)
   const align = style.align === 'center' ? 1 : style.align === 'right' ? 2 : 0;
@@ -146,14 +166,11 @@ export function openStyle(style: TextStyle = {}, opts: EscPosTextOptions = {}): 
 }
 
 /**
- * Réinitialise les styles transitoires après un item.
- * ESC @ (reset complet) + FS . (annule le mode caractères chinois/Kanji double-octet) :
- * sans FS ., les imprimantes "génériques" chinoises en mode CJK avalent les octets ≥0x80
- * par paires (accents -> idéogrammes) et ignorent la page de code (ESC t). ESC @ pouvant
- * restaurer le mode CJK par défaut, on renvoie FS . à chaque reset.
+ * Réinitialise les styles transitoires après un item (ESC @ = reset complet). Le mode
+ * caractères (FS . latin / FS & CJK) est (re)sélectionné par `openStyle` avant chaque texte.
  */
 export function resetStyle(): number[] {
-  return [ESC, 0x40, 0x1c, 0x2e];
+  return [ESC, 0x40];
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +265,7 @@ export function encodeEscPosItems(items: PrintItem[], opts: EscPosTextOptions = 
       case 'text': {
         const style = item.style ?? {};
         parts.push(openStyle(style, opts));
-        parts.push(encodeString(item.value, style.codePage ?? opts.defaultCodePage ?? 'WPC1252'));
+        parts.push(encodeString(item.value, style.encoding ?? style.codePage ?? opts.encoding ?? opts.defaultCodePage ?? 'WPC1252'));
         if (style.newline !== false) parts.push([LF]);
         parts.push(resetStyle());
         break;

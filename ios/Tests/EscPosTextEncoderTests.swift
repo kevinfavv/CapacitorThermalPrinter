@@ -22,6 +22,24 @@ final class EscPosTextEncoderTests: XCTestCase {
         XCTAssertEqual(EscPosTextEncoder.encodeString("€"), [0x3F])
     }
 
+    func testEncodeStringCJKMultibyte() {
+        // 中 (U+4E2D) en GB18030 = 0xD6 0xD0 (double-octet), pas '?'.
+        XCTAssertEqual(EscPosTextEncoder.encodeString("中", codePage: "GB18030"), [0xD6, 0xD0])
+    }
+
+    func testCJKSelectsIdeographMode() {
+        var style = TextStyle(); style.codePage = "GB18030"
+        let s = bytes([.text(value: "中", style: style)]).map(String.init).joined(separator: ",")
+        XCTAssertTrue(s.contains("28,38")) // FS & (mode CJK)
+        XCTAssertFalse(s.contains("27,116")) // pas de ESC t (page latine)
+    }
+
+    func testLatinCancelsCJKMode() {
+        let s = bytes([.text(value: "e", style: TextStyle())]).map(String.init).joined(separator: ",")
+        XCTAssertTrue(s.contains("28,46")) // FS . (annule CJK)
+        XCTAssertTrue(s.contains("27,116")) // ESC t (page de code)
+    }
+
     func testTextJobStartsWithResetAndEndsWithLF() {
         let b = bytes([.text(value: "Hi", style: TextStyle())])
         XCTAssertEqual(b[0], 0x1B)
