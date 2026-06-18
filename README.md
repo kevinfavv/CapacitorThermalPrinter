@@ -199,23 +199,26 @@ module names, and the git-ignored test folder.
 
 ### Tested on real hardware
 
-> ✅ **Verified on a real iPhone (iOS):** an **Epson** printer over **Bluetooth (MFi)** and a
-> **generic BLE** ESC/POS printer (MP210) both print full tickets end-to-end — downloaded
-> logo + styled text + **scannable QR** + cut, with correct French accents. See the
-> on-device notes in [`CONTRIBUTING.md`](CONTRIBUTING.md#verified-on-a-real-iphone-manual-june-2026).
+> ✅ **Verified on real hardware (iOS + Android):** Epson over Bluetooth & network, generic
+> BLE, and generic Bluetooth Classic (Android) all print full tickets end-to-end — logo +
+> styled text + **scannable QR** + cut. See the on-device notes in
+> [`CONTRIBUTING.md`](CONTRIBUTING.md#verified-on-a-real-iphone-manual-june-2026).
 
-| Target | On-device tested (iOS) |
-|---|---|
-| **Epson** — Bluetooth (MFi) | ✅ **OK on iPhone** (discover + connect + print) |
-| **Generic BLE** ESC/POS (e.g. MP210) | ✅ **OK on iPhone** (logo + text + QR) |
-| Network ESC/POS (Wi-Fi / Bonjour / TCP 9100) | ✅ verified (virtual printer + CI) |
-| **Star** | ⏳ planned |
-| **Brother** | ⏳ planned |
-| **Zebra** | ⏳ planned |
+| Target | On-device tested (iOS) | On-device tested (Android) |
+|---|---|---|
+| **Epson** — Bluetooth (MFi iOS / ePOS2 Android) | ✅ **OK on iPhone** | ✅ **OK on Android** |
+| **Epson** — Network (Wi-Fi / TCP) | ✅ verified | ✅ **tested on Android** |
+| **Generic BLE** ESC/POS (e.g. MP210) | ✅ **OK on iPhone** | ✅ **tested on Android** |
+| **Generic Bluetooth Classic** (SPP) ESC/POS | ⛔ N/A (no iOS API) | ✅ **tested on Android** |
+| Network ESC/POS (Wi-Fi / Bonjour / TCP 9100) | ✅ verified (virtual printer + CI) | ✅ **tested on Android** |
+| **Star** | ⏳ planned | ⏳ planned |
+| **Brother** | ⏳ planned | ⏳ planned |
+| **Zebra** | ⏳ planned | ⏳ planned |
 
 > Bluetooth/BLE and MFi can't run on the iOS Simulator, so these are validated **manually on
 > device**; the TCP path is covered automatically in CI. On **iOS, generic Bluetooth Classic
 > (SPP) is not possible** (Apple exposes no API) — use **BLE**, **MFi (brand SDK)** or **Wi-Fi**.
+> On **Android**, generic Bluetooth Classic (SPP) **is** supported and tested.
 
 ### Know which SDKs are active (runtime)
 
