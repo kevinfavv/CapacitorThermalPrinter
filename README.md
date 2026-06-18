@@ -209,7 +209,7 @@ module names, and the git-ignored test folder.
 | **Epson** — Bluetooth (MFi iOS / ePOS2 Android) | ✅ **Tested on iOS** | ✅ **Tested on Android** |
 | **Epson** — Network (Wi-Fi / TCP) | ✅ **Tested on iOS** | ✅ **Tested on Android** |
 | **Generic BLE** ESC/POS (e.g. MP210) | ✅ **Tested on iOS** | ✅ **Tested on Android** |
-| **Generic Bluetooth Classic** (SPP) ESC/POS | ⛔ N/A (no iOS API) | ✅ **Tested on Android** |
+| **Generic Bluetooth Classic** (SPP) ESC/POS | ⛔ **Blocked on iOS** (no Apple API) | ✅ **Tested on Android** |
 | Network ESC/POS (Wi-Fi / Bonjour / TCP 9100) | ✅ **Tested on iOS** | ✅ **Tested on Android** |
 | **Star** | ⏳ planned | ⏳ planned |
 | **Brother** | ⏳ planned | ⏳ planned |
