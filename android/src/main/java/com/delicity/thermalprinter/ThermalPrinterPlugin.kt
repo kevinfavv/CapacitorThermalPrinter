@@ -201,6 +201,7 @@ class ThermalPrinterPlugin : Plugin() {
         val render = call.getObject("render")?.let { r ->
             RenderOptions(
                 widthDots = r.optInt("widthDots", 0),
+                paperWidthMm = r.optInt("paperWidthMm", 0),
                 resize = r.optBoolean("resize", true),
                 grayscale = r.optBoolean("grayscale", true),
                 threshold = r.optInt("threshold", 128),

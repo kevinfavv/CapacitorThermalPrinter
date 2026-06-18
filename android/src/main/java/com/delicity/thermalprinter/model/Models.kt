@@ -193,6 +193,8 @@ data class PrinterStatus(
 /** Options de rendu résolues passées à l'adapter. */
 data class RenderOptions(
     val widthDots: Int,
+    /** Largeur papier en mm (58/80/112) ; convertie en points si `widthDots` absent. 0 = non fourni. */
+    val paperWidthMm: Int = 0,
     val resize: Boolean = true,
     val grayscale: Boolean = true,
     val threshold: Int = 128,

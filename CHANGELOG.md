@@ -4,6 +4,17 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.0.9]
+
+### Corrigé
+- **Android — `render.paperWidthMm` ignoré (image non imprimée sur imprimante 58 mm).**
+  L'option `paperWidthMm` du `printImage` était documentée mais jamais appliquée côté Android
+  (ni parsée, ni utilisée) : le plugin gardait 576 pts (80 mm) par défaut. Une imprimante
+  Bluetooth générique 58 mm (384 pts) recevait alors un raster 576 pts trop large qu'elle
+  **rejette silencieusement** (l'appel réussit mais rien ne s'imprime). `paperWidthMm` est
+  désormais parsé et **prioritaire** sur la largeur par défaut du profil
+  (`widthDots` > `paperWidthMm` > profil), avec conversion 58→384 / 80→576 / 112→832.
+
 ## [7.0.8]
 
 ### Corrigé

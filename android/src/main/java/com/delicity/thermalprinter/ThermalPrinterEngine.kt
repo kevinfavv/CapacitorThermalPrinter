@@ -528,10 +528,17 @@ class ThermalPrinterEngine(private val context: Context) {
         else -> throw PrinterException(ErrorCode.IMAGE_INVALID, "Aucune source image fournie")
     }
 
+    private fun dotsForPaperWidth(mm: Int): Int = when (mm) { 58 -> 384; 112 -> 832; else -> 576 }
+
     private fun resolveRenderOptions(profile: PrinterProfile, req: RenderOptions?): RenderOptions {
+        // Priorité : widthDots explicite > paperWidthMm explicite (override par appel) >
+        // largeur du profil > paperWidthMm du profil. paperWidthMm de l'appel DOIT primer sur
+        // printableDots du profil (576 par défaut sur générique BT), sinon une imprimante 58mm
+        // reçoit un raster 576 pts qu'elle rejette silencieusement (image absente).
         val width = req?.widthDots?.takeIf { it > 0 }
+            ?: req?.paperWidthMm?.takeIf { it > 0 }?.let { dotsForPaperWidth(it) }
             ?: profile.capabilities.printableDots.takeIf { it > 0 }
-            ?: when (profile.capabilities.paperWidthMm) { 58 -> 384; 112 -> 832; else -> 576 }
+            ?: dotsForPaperWidth(profile.capabilities.paperWidthMm)
         return (req ?: RenderOptions(widthDots = width)).copy(widthDots = width)
     }
 }
