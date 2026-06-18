@@ -98,7 +98,11 @@ object EscPosTextEncoder {
         else out.write(byteArrayOf(ESC.toByte(), 0x32))
     }
 
-    private fun reset(out: ByteArrayOutputStream) = out.write(byteArrayOf(ESC.toByte(), 0x40))
+    // ESC @ (réinit) + FS . (annule le mode caractères chinois/Kanji double-octet). Sans
+    // FS ., les imprimantes "génériques" chinoises en mode CJK avalent les octets ≥0x80 par
+    // paires (accents -> idéogrammes, ex. "éàçùê" -> "獣琦") et IGNORENT la page de code
+    // (ESC t). ESC @ pouvant restaurer le mode CJK par défaut, on renvoie FS . à chaque reset.
+    private fun reset(out: ByteArrayOutputStream) = out.write(byteArrayOf(ESC.toByte(), 0x40, 0x1C, 0x2E))
 
     private fun qrCode(out: ByteArrayOutputStream, item: PrintItem.QrCode) {
         val align = when (item.align) { "left" -> 0; "right" -> 2; else -> 1 }

@@ -92,8 +92,8 @@ describe('openStyle', () => {
 });
 
 describe('resetStyle', () => {
-  it('émet ESC @', () => {
-    expect(resetStyle()).toEqual([ESC, 0x40]);
+  it('émet ESC @ + FS . (annule le mode CJK double-octet)', () => {
+    expect(resetStyle()).toEqual([ESC, 0x40, 0x1c, 0x2e]);
   });
 });
 
@@ -165,8 +165,9 @@ describe('encodeEscPosItems (intégration)', () => {
 
   it('respecte newline:false (pas de LF ajouté)', () => {
     const { bytes } = encodeEscPosItems([{ type: 'text', value: 'X', style: { newline: false } }]);
-    // dernier octet = reset ESC @ (0x40), pas un LF
-    expect(bytes[bytes.length - 1]).toBe(0x40);
+    // se termine par le reset ESC @ + FS . (dernier octet 0x2e), pas un LF
+    expect(bytes[bytes.length - 1]).toBe(0x2e);
+    expect(bytes).not.toContain(0x0a);
   });
 
   it('génère un divider pleine largeur', () => {

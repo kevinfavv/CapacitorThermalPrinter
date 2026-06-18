@@ -145,9 +145,15 @@ export function openStyle(style: TextStyle = {}, opts: EscPosTextOptions = {}): 
   return cmds.flat();
 }
 
-/** Réinitialise les styles transitoires après un item (ESC @ = reset complet). */
+/**
+ * Réinitialise les styles transitoires après un item.
+ * ESC @ (reset complet) + FS . (annule le mode caractères chinois/Kanji double-octet) :
+ * sans FS ., les imprimantes "génériques" chinoises en mode CJK avalent les octets ≥0x80
+ * par paires (accents -> idéogrammes) et ignorent la page de code (ESC t). ESC @ pouvant
+ * restaurer le mode CJK par défaut, on renvoie FS . à chaque reset.
+ */
 export function resetStyle(): number[] {
-  return [ESC, 0x40];
+  return [ESC, 0x40, 0x1c, 0x2e];
 }
 
 // ---------------------------------------------------------------------------

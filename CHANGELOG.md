@@ -4,6 +4,16 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.0.8]
+
+### Corrigé
+- **Android — accents transformés en idéogrammes sur certaines imprimantes Bluetooth.**
+  Les imprimantes "génériques" chinoises démarrent souvent en **mode caractères chinois
+  (double-octet)** : elles avalent les octets ≥0x80 par paires (ex. `éàçùê` → `獣琦`) et
+  ignorent la page de code (`ESC t`). L'encodeur émet désormais **`FS .`** (annule le mode
+  Kanji/chinois) après chaque `ESC @`, ce qui force le mono-octet et rend `ESC t` + le
+  remap d'accents (v7.0.7) effectifs. Appliqué côté Kotlin et TS (parité).
+
 ## [7.0.7]
 
 ### Corrigé
