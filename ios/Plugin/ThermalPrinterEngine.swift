@@ -147,6 +147,7 @@ final class ThermalPrinterEngine {
         let feedLines: Int
         let timeoutMs: Int
         let autoReconnect: Bool
+        let paperWidthMm: Int?
     }
 
     struct PrintOutcome {
@@ -193,7 +194,12 @@ final class ThermalPrinterEngine {
     func printText(_ req: PrintTextRequest) async throws -> PrintOutcome {
         let started = Date()
         let jobId = UUID().uuidString
-        let profile = try resolveTargetProfile(req.printerId)
+        var profile = try resolveTargetProfile(req.printerId)
+        if let mm = req.paperWidthMm, mm > 0 {
+            // Largeur par appel : surcharge colonnes/mise en page (dividers).
+            profile.capabilities.paperWidthMm = mm
+            profile.capabilities.printableDots = Self.dots(forMm: mm)
+        }
         emitJob(jobId, profile.id, "pending")
         guard let adapter = adapterFor(profile.adapter) else {
             let e = PrinterError(.UNSUPPORTED_PRINTER, "Adapter introuvable")

@@ -155,6 +155,13 @@ export interface PrintTextOptions {
   timeoutMs?: number;
   /** Reconnexion automatique si non connecté. Défaut true. */
   autoReconnect?: boolean;
+  /**
+   * Largeur **papier en mm** (58/80/112) pour CE job texte : détermine le nombre de
+   * colonnes (dividers, mise en page). Surcharge la largeur du profil connecté — utile
+   * quand le profil n'est pas à la bonne largeur. Équivalent de `render.paperWidthMm`
+   * pour `printImage`. Si omis : largeur du profil.
+   */
+  paperWidthMm?: number;
 }
 
 /**

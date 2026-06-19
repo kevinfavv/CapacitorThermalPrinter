@@ -538,6 +538,7 @@ interface PrintTextOptions {
   feedLines?: number;         // default 3
   timeoutMs?: number;
   autoReconnect?: boolean;
+  paperWidthMm?: number;      // per-call paper width (58/80/112) → divider columns / layout
 }
 ```
 

@@ -200,7 +200,8 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
             cut: call.getBool("cut") ?? false,
             feedLines: call.getInt("feedLines") ?? 3,
             timeoutMs: call.getInt("timeoutMs") ?? 15000,
-            autoReconnect: call.getBool("autoReconnect") ?? true
+            autoReconnect: call.getBool("autoReconnect") ?? true,
+            paperWidthMm: call.getInt("paperWidthMm")
         )
         Task { await self.guarded(call) {
             let out = try await self.engine.printText(req)

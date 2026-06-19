@@ -256,6 +256,7 @@ class ThermalPrinterPlugin : Plugin() {
             feedLines = call.getInt("feedLines") ?: 3,
             timeoutMs = (call.getInt("timeoutMs")?.toLong()) ?: 15000L,
             autoReconnect = call.getBoolean("autoReconnect", true) ?: true,
+            paperWidthMm = call.getInt("paperWidthMm"),
         )
         val out = engine.printText(req)
         printResultJson(out)

@@ -232,6 +232,7 @@ class ThermalPrinterEngine(private val context: Context) {
         val feedLines: Int = 3,
         val timeoutMs: Long = 15000,
         val autoReconnect: Boolean = true,
+        val paperWidthMm: Int? = null,
     )
 
     data class PrintOutcome(
@@ -291,7 +292,14 @@ class ThermalPrinterEngine(private val context: Context) {
         val started = System.currentTimeMillis()
         val jobId = java.util.UUID.randomUUID().toString()
 
-        val profile = resolveTargetProfile(req.printerId)
+        val resolved = resolveTargetProfile(req.printerId)
+        // Largeur par appel : surcharge colonnes/mise en page (dividers) sans dépendre du
+        // profil persisté. Voir PrintTextOptions.paperWidthMm.
+        val profile = if (req.paperWidthMm != null && req.paperWidthMm > 0)
+            resolved.copy(capabilities = resolved.capabilities.copy(
+                paperWidthMm = req.paperWidthMm,
+                printableDots = dotsForPaperWidth(req.paperWidthMm)))
+        else resolved
         emitJob(jobId, profile.id, "pending")
         val adapter = adapterFor(profile)
             ?: throw failJob(jobId, profile.id, PrinterException(ErrorCode.UNSUPPORTED_PRINTER, "Adapter introuvable"))

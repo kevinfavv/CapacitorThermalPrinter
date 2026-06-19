@@ -4,6 +4,15 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.1.4]
+
+### Ajouté
+- **`PrintTextOptions.paperWidthMm` — largeur papier par appel pour `printText`.**
+  Détermine le nombre de colonnes (dividers, mise en page) en surchargeant la largeur
+  du profil connecté. Corrige les dividers trop larges quand le profil n'est pas à la
+  bonne largeur (ex. 58mm imprimé via un profil resté en 80mm). Équivalent de
+  `render.paperWidthMm` pour `printImage`.
+
 ## [7.1.3]
 
 ### Ajouté
