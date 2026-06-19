@@ -256,6 +256,23 @@ available on the device.
 
 Call `requestPermissions()` before the first scan.
 
+### Bluetooth adapter state
+
+`isBluetoothEnabled()` reports whether the device Bluetooth **adapter is powered on**
+(distinct from permissions — a granted permission does not mean Bluetooth is on):
+
+```ts
+const { enabled } = await ThermalPrinter.isBluetoothEnabled();
+if (!enabled) {
+  // Prompt the user to turn Bluetooth on before printing to a BT printer.
+}
+```
+
+- **Android**: real `BluetoothAdapter` state.
+- **iOS**: CoreBluetooth state (`poweredOn`); the first call may take ~300 ms to settle
+  and never shows the system power alert.
+- **Web**: always `false`.
+
 ### iOS (host app `Info.plist`)
 
 ```xml
@@ -294,6 +311,7 @@ ThermalPrinter.printImage(options)                                       // → 
 ThermalPrinter.printText({ items, ... })                                 // → PrintResult (await = printed)
 ThermalPrinter.getPrinterStatus({ printerId? })                          // → PrinterStatus
 ThermalPrinter.requestPermissions() / checkPermissions()                 // → PermissionStatus
+ThermalPrinter.isBluetoothEnabled()                                      // → { enabled: boolean } (adapter on/off)
 ThermalPrinter.startStatusMonitor({ printerId, intervalMs? })            // background status polling
 ThermalPrinter.stopStatusMonitor({ printerId })
 ThermalPrinter.getActiveSdks()                                           // → { sdks: SdkStatus[] }

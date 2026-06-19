@@ -1,6 +1,8 @@
 package com.delicity.thermalprinter
 
 import android.Manifest
+import android.bluetooth.BluetoothManager
+import android.content.Context
 import android.os.Build
 import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
@@ -96,6 +98,18 @@ class ThermalPrinterPlugin : Plugin() {
             put("location", state("location"))
             put("localNetwork", "granted") // pas de permission runtime réseau sur Android
         }
+    }
+
+    /** Renvoie true si l'adaptateur Bluetooth est activé. */
+    @PluginMethod
+    fun isBluetoothEnabled(call: PluginCall) {
+        val enabled = try {
+            val mgr = context.getSystemService(Context.BLUETOOTH_SERVICE) as? BluetoothManager
+            mgr?.adapter?.isEnabled == true
+        } catch (e: Exception) {
+            false
+        }
+        call.resolve(JSObject().put("enabled", enabled))
     }
 
     // ---------------------------------------------------------------------

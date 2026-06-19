@@ -94,6 +94,10 @@ export class ThermalPrinterWeb extends WebPlugin implements ThermalPrinterPlugin
     };
   }
 
+  async isBluetoothEnabled(): Promise<{ enabled: boolean }> {
+    return { enabled: false };
+  }
+
   async startStatusMonitor(_options: { printerId: string; intervalMs?: number }): Promise<void> {
     return;
   }

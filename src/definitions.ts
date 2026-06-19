@@ -140,6 +140,17 @@ export interface ThermalPrinterPlugin {
   requestPermissions(): Promise<PermissionStatus>;
   checkPermissions(): Promise<PermissionStatus>;
 
+  /**
+   * Indique si l'adaptateur Bluetooth de l'appareil est actuellement **activé**.
+   * - Android : état réel de `BluetoothAdapter` (allumé/éteint).
+   * - iOS     : état CoreBluetooth (`poweredOn`).
+   * - Web     : toujours `false`.
+   *
+   * Distinct des permissions (`checkPermissions`) : une permission accordée
+   * n'implique pas que l'adaptateur soit allumé.
+   */
+  isBluetoothEnabled(): Promise<{ enabled: boolean }>;
+
   /** Active/désactive le monitoring de statut en arrière-plan pour une imprimante. */
   startStatusMonitor(options: { printerId: string; intervalMs?: number }): Promise<void>;
   stopStatusMonitor(options: { printerId: string }): Promise<void>;

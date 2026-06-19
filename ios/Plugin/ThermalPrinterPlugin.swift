@@ -1,5 +1,6 @@
 import Foundation
 import Capacitor
+import CoreBluetooth
 
 /// Pont Capacitor iOS (bridge JS <-> Swift). Conforme Capacitor 7 (CAPBridgedPlugin).
 ///
@@ -24,6 +25,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "getPrinterStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestPermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkPermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "isBluetoothEnabled", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startStatusMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopStatusMonitor", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getActiveSdks", returnType: CAPPluginReturnPromise),
@@ -31,6 +33,7 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
     ]
 
     private let engine = ThermalPrinterEngine()
+    private let btProbe = BluetoothStateProbe()
 
     override public func load() {
         // Relaye les états de job vers le JS (event printJobStatus).
@@ -67,6 +70,15 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
             "location": "granted",
             "localNetwork": "prompt",          // pop-up système à la 1re connexion locale
         ]
+    }
+
+    /// Renvoie true si l'adaptateur Bluetooth (CoreBluetooth) est allumé.
+    @objc func isBluetoothEnabled(_ call: CAPPluginCall) {
+        btProbe.ensureStarted()
+        // Laisse CoreBluetooth initialiser son état au premier appel.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            call.resolve(["enabled": self.btProbe.isPoweredOn])
+        }
     }
 
     // MARK: Découverte
@@ -262,4 +274,19 @@ public class ThermalPrinterPlugin: CAPPlugin, CAPBridgedPlugin {
             call.reject(error.localizedDescription, ErrorCode.UNKNOWN.rawValue, error)
         }
     }
+}
+
+/// Sonde l'état de l'adaptateur Bluetooth via CoreBluetooth, sans déclencher la pop-up
+/// système d'alimentation (ShowPowerAlert=false). La permission BLE n'est demandée qu'à
+/// la première utilisation réelle (scan/connexion), pas à la simple lecture d'état.
+final class BluetoothStateProbe: NSObject, CBCentralManagerDelegate {
+    private var manager: CBCentralManager?
+    func ensureStarted() {
+        if manager == nil {
+            manager = CBCentralManager(delegate: self, queue: nil,
+                                       options: [CBCentralManagerOptionShowPowerAlertKey: false])
+        }
+    }
+    var isPoweredOn: Bool { manager?.state == .poweredOn }
+    func centralManagerDidUpdateState(_ central: CBCentralManager) {}
 }

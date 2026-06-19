@@ -4,6 +4,14 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [7.1.3]
+
+### Ajouté
+- **`isBluetoothEnabled()` — état réel de l'adaptateur Bluetooth (allumé/éteint).**
+  Distinct des permissions (`checkPermissions`). Android : `BluetoothAdapter`. iOS :
+  CoreBluetooth (`poweredOn`, sans pop-up système). Web : `false`. Permet d'inviter
+  l'utilisateur à activer le Bluetooth avant d'imprimer.
+
 ## [7.1.2]
 
 ### Ajouté
