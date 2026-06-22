@@ -146,11 +146,14 @@ export function openStyle(style: TextStyle = {}, opts: EscPosTextOptions = {}): 
   // Inversion vidéo (GS B n)
   cmds.push([GS, 0x42, style.invert ? 1 : 0]);
 
-  // Upside-down (ESC { n)
-  cmds.push([ESC, 0x7b, style.upsideDown ? 1 : 0]);
+  // Upside-down (ESC { n) — n'émettre QUE si activé. L'imprimante interne SUNMI ne
+  // supporte pas ESC { et imprime l'octet 0x7B ("{") littéralement. L'état par défaut
+  // (off) est déjà garanti par le ESC @ qui précède chaque item, donc émettre "0" est
+  // inutile et casse SUNMI. Idem ESC V ci-dessous.
+  if (style.upsideDown) cmds.push([ESC, 0x7b, 1]);
 
-  // Rotation 90° (ESC V n)
-  cmds.push([ESC, 0x56, style.rotate90 ? 1 : 0]);
+  // Rotation 90° (ESC V n) — voir note ci-dessus (SUNMI imprime "V" littéralement)
+  if (style.rotate90) cmds.push([ESC, 0x56, 1]);
 
   // Taille (GS ! n)
   cmds.push([GS, 0x21, sizeByte(style.widthMultiplier, style.heightMultiplier)]);

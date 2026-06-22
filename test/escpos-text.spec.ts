@@ -89,6 +89,15 @@ describe('openStyle', () => {
   it('émet l’interligne par défaut (ESC 2) quand lineSpacing absent', () => {
     expect(openStyle({}).join(',')).toContain([ESC, 0x32].join(','));
   });
+
+  it('n’émet PAS ESC { / ESC V quand upsideDown/rotate90 sont off (régression SUNMI)', () => {
+    // L'imprimante interne SUNMI imprime "{" (0x7B) / "V" (0x56) littéralement quand
+    // ESC { / ESC V lui sont envoyés. On ne doit donc émettre ces commandes que si la
+    // fonctionnalité est active — sinon "{ V" apparaît devant chaque ligne.
+    const s = openStyle({}).join(',');
+    expect(s).not.toContain([ESC, 0x7b].join(','));
+    expect(s).not.toContain([ESC, 0x56].join(','));
+  });
 });
 
 describe('resetStyle', () => {

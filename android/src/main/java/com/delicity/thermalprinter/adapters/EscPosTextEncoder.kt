@@ -118,8 +118,12 @@ object EscPosTextEncoder {
         val ul = when (s.underline) { "single" -> 1; "double" -> 2; else -> 0 }
         out.write(byteArrayOf(ESC.toByte(), 0x2D, ul.toByte()))
         out.write(byteArrayOf(GS.toByte(), 0x42, if (s.invert) 1 else 0))
-        out.write(byteArrayOf(ESC.toByte(), 0x7B, if (s.upsideDown) 1 else 0))
-        out.write(byteArrayOf(ESC.toByte(), 0x56, if (s.rotate90) 1 else 0))
+        // ESC { (upside-down) / ESC V (rotation 90°) : n'émettre QUE si activé.
+        // L'imprimante interne SUNMI ne supporte pas ces commandes et imprime les
+        // octets 0x7B ("{") / 0x56 ("V") littéralement devant chaque ligne. L'état
+        // par défaut (off) est déjà garanti par le ESC @ qui précède chaque item.
+        if (s.upsideDown) out.write(byteArrayOf(ESC.toByte(), 0x7B, 1))
+        if (s.rotate90) out.write(byteArrayOf(ESC.toByte(), 0x56, 1))
         out.write(byteArrayOf(GS.toByte(), 0x21, sizeByte(s.widthMultiplier, s.heightMultiplier).toByte()))
         s.letterSpacing?.let { out.write(byteArrayOf(ESC.toByte(), 0x20, (it and 0xFF).toByte())) }
         if (s.lineSpacing != null) out.write(byteArrayOf(ESC.toByte(), 0x33, (s.lineSpacing and 0xFF).toByte()))

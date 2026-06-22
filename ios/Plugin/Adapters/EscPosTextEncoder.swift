@@ -98,8 +98,12 @@ enum EscPosTextEncoder {
         let ul: UInt8 = s.underline == "single" ? 1 : (s.underline == "double" ? 2 : 0)
         out += [ESC, 0x2D, ul]
         out += [GS, 0x42, s.invert ? 1 : 0]
-        out += [ESC, 0x7B, s.upsideDown ? 1 : 0]
-        out += [ESC, 0x56, s.rotate90 ? 1 : 0]
+        // ESC { (upside-down) / ESC V (rotation 90°) : n'émettre QUE si activé.
+        // L'imprimante interne SUNMI ne supporte pas ces commandes et imprime les
+        // octets 0x7B ("{") / 0x56 ("V") littéralement devant chaque ligne. L'état
+        // par défaut (off) est déjà garanti par le ESC @ qui précède chaque item.
+        if s.upsideDown { out += [ESC, 0x7B, 1] }
+        if s.rotate90 { out += [ESC, 0x56, 1] }
         out += [GS, 0x21, sizeByte(s.widthMultiplier, s.heightMultiplier)]
         if let ls = s.letterSpacing { out += [ESC, 0x20, UInt8(truncatingIfNeeded: ls)] }
         if let lsp = s.lineSpacing { out += [ESC, 0x33, UInt8(truncatingIfNeeded: lsp)] } else { out += [ESC, 0x32] }
