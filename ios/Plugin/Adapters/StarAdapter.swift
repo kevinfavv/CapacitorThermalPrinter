@@ -143,7 +143,18 @@ final class StarAdapter: PrinterAdapter {
         #if canImport(StarIO10)
         let printer = try requireConnected(profile)
         let pb = StarXpandCommand.PrinterBuilder()
-        for item in items { Self.map(item, into: pb, profile: profile) }
+        if Self.isRasterOnly(profile.model) {
+            // Famille TSP100 (TSP100/TSP143/III/IV) : imprimantes GRAPHICS-ONLY, sans police
+            // interne -> `actionPrintText` n'imprime RIEN (seuls QR/image rasterisés sortent).
+            // On rend donc tous les items en image et on imprime via actionPrintImage.
+            // Réf. StarXpand FAQ "TSP100" + StarXpand-SDK-iOS issue #24.
+            let width = profile.capabilities.printableDots > 0 ? profile.capabilities.printableDots : 576
+            let image = TextRasterizer.render(items, widthDots: width)
+            _ = pb.styleAlignment(.left)
+                .actionPrintImage(StarXpandCommand.Printer.ImageParameter(image: image, width: max(8, width)))
+        } else {
+            for item in items { Self.map(item, into: pb, profile: profile) }
+        }
         if feedLines > 0 { _ = pb.actionFeedLine(feedLines) }
         if cut && profile.capabilities.supportsCut { _ = pb.actionCut(.partial) }
         let commands = StarXpandCommand.StarXpandCommandBuilder()
@@ -217,6 +228,13 @@ final class StarAdapter: PrinterAdapter {
         case .usb: return .usb
         @unknown default: return .wifi
         }
+    }
+
+    /// Modèles Star « graphics-only » (famille TSP100) : pas de polices internes, donc
+    /// `actionPrintText` n'imprime rien. On bascule alors sur un rendu image (actionPrintImage).
+    static func isRasterOnly(_ model: String?) -> Bool {
+        guard let m = model?.uppercased() else { return false }
+        return m.contains("TSP100") || m.contains("TSP143")
     }
 
     private static func alignment(for align: String) -> StarXpandCommand.Printer.Alignment {

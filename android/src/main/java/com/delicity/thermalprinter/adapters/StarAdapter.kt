@@ -2,6 +2,7 @@ package com.delicity.thermalprinter.adapters
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.delicity.thermalprinter.image.TextRasterizer
 import com.delicity.thermalprinter.model.AdapterId
 import com.delicity.thermalprinter.model.DiscoveredPrinter
 import com.delicity.thermalprinter.model.ErrorCode
@@ -167,7 +168,16 @@ class StarAdapter(private val context: Context) : PrinterAdapter {
     ): Int {
         val printer = requireConnected(profile)
         val pb = PrinterBuilder()
-        for (item in items) mapItem(pb, item, profile)
+        if (isRasterOnly(profile.model)) {
+            // Famille TSP100 (TSP100/TSP143/III/IV) : GRAPHICS-ONLY, sans police interne ->
+            // actionPrintText n'imprime RIEN (seuls QR/image rasterisés sortent). On rend donc
+            // tous les items en image et on imprime via actionPrintImage. Réf. StarXpand FAQ "TSP100".
+            val width = if (profile.capabilities.printableDots > 0) profile.capabilities.printableDots else 576
+            val bmp = TextRasterizer.render(items, width)
+            pb.styleAlignment(alignmentFor("left")).actionPrintImage(ImageParameter(bmp, width.coerceAtLeast(8)))
+        } else {
+            for (item in items) mapItem(pb, item, profile)
+        }
         if (feedLines > 0) pb.actionFeedLine(feedLines)
         if (cut && profile.capabilities.supportsCut) pb.actionCut(CutType.Partial)
         val commands = StarXpandCommandBuilder()
@@ -175,6 +185,12 @@ class StarAdapter(private val context: Context) : PrinterAdapter {
             .getCommands()
         sendCommands(printer, commands, profile)
         return commands.length
+    }
+
+    /** Modèles Star « graphics-only » (famille TSP100) : actionPrintText n'imprime rien -> image. */
+    private fun isRasterOnly(model: String?): Boolean {
+        val m = model?.uppercase() ?: return false
+        return m.contains("TSP100") || m.contains("TSP143")
     }
 
     /** Mappe un PrintItem vers le builder StarXpand (best effort par type). */
