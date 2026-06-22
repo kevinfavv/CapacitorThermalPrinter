@@ -4,7 +4,7 @@
 
 For **any Capacitor app that needs to print** — point of sale, receipts, order tickets, shipping/label printing, kitchen slips, etc. The user taps "Add a printer", picks one from a list, runs a test print, and never has to touch the phone's Bluetooth/Wi-Fi settings again.
 
-**Requires Capacitor 7** · Android (**`minSdk 26`**, `compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
+**Requires Capacitor 8** · Android (**`minSdk 26`**, `compileSdk 36`, JDK 21) · iOS 15+ / Xcode 26+.
 
 > 🚧 **Work in progress.** This plugin is under active development and **not yet
 > validated on real hardware** (see [Tested on real hardware](#tested-on-real-hardware)).
@@ -45,7 +45,7 @@ For **any Capacitor app that needs to print** — point of sale, receipts, order
 
 ## Installation
 
-> Package: **`@delicity/capacitor-thermal-printer`** · Capacitor 7 · Android (**`minSdk 26`**, `compileSdk 35`, JDK 21) · iOS 14+ / Xcode 16+.
+> Package: **`@delicity/capacitor-thermal-printer`** · Capacitor 8 · Android (**`minSdk 26`**, `compileSdk 36`, JDK 21) · iOS 15+ / Xcode 26+.
 
 ### Step by step
 

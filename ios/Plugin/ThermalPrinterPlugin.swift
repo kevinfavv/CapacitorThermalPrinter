@@ -2,7 +2,7 @@ import Foundation
 import Capacitor
 import CoreBluetooth
 
-/// Pont Capacitor iOS (bridge JS <-> Swift). Conforme Capacitor 7 (CAPBridgedPlugin).
+/// Pont Capacitor iOS (bridge JS <-> Swift). Conforme Capacitor 8 (CAPBridgedPlugin).
 ///
 /// Mappe l'API publique (definitions.ts) vers ThermalPrinterEngine. Les opérations
 /// async tournent dans des Task ; les PrinterError sont converties en rejets
