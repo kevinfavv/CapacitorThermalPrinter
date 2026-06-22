@@ -11,6 +11,9 @@ enum AdapterId: String, Codable {
     case escpos, epson, star, brother, zebra, ble
     case rawTcp = "rawTcp"
     static func from(_ v: String?) -> AdapterId { AdapterId(rawValue: v ?? "") ?? .escpos }
+
+    /// Vrai si l'adapter est un SDK officiel fabricant (et non le natif générique).
+    var isSdk: Bool { self == .epson || self == .star || self == .brother || self == .zebra }
 }
 
 /// Codes d'erreur normalisés. Aligné avec PrintErrorCode (TypeScript).
@@ -86,7 +89,7 @@ struct DiscoveredPrinter {
         var d: [String: Any] = [
             "id": id, "name": name, "transport": transport.rawValue, "adapter": adapter.rawValue,
             "address": address, "lastSeenAt": lastSeenAt, "isDefault": isDefault, "isConnected": isConnected,
-            "discoveredBy": Array(discoveredBy),
+            "discoveredBy": Array(discoveredBy), "isSdk": adapter.isSdk,
         ]
         if let brand = brand { d["brand"] = brand }
         if let model = model { d["model"] = model }

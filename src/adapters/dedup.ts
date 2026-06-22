@@ -1,6 +1,8 @@
 import type { PrinterTransport } from '../core/enums';
 import type { DiscoveredPrinter } from '../core/models';
 
+import { isSdkAdapter } from './priority';
+
 /**
  * Construit un identifiant interne stable pour une imprimante.
  *
@@ -53,7 +55,7 @@ export function mergeDiscoveries(
   for (const printer of incoming) {
     const existing = byId.get(printer.id);
     if (!existing) {
-      byId.set(printer.id, { ...printer, discoveredBy: dedupeSources(printer) });
+      byId.set(printer.id, { ...printer, isSdk: isSdkAdapter(printer.adapter), discoveredBy: dedupeSources(printer) });
       continue;
     }
 
@@ -66,6 +68,7 @@ export function mergeDiscoveries(
     const winner = adapterRank(printer) > adapterRank(existing) ? printer : existing;
     byId.set(printer.id, {
       ...winner,
+      isSdk: isSdkAdapter(winner.adapter),
       // capacités: union (on garde le plus d'infos possible)
       capabilities: { ...existing.capabilities, ...printer.capabilities, ...winner.capabilities },
       lastSeenAt: Math.max(existing.lastSeenAt, printer.lastSeenAt),
@@ -75,7 +78,57 @@ export function mergeDiscoveries(
     });
   }
 
-  return Array.from(byId.values());
+  return collapseSdkDuplicates(Array.from(byId.values()));
+}
+
+/**
+ * 2ᵉ passe de fusion : une même imprimante physique peut être remontée à la
+ * fois par son SDK fabricant ET par une source native générique sous un `id`
+ * différent (transport/adresse distincts) — typiquement une Epson visible aussi
+ * en Bluetooth classique. Dans ce cas on ne veut PAS deux entrées : on garde
+ * l'entrée SDK (priorité produit) et on y fusionne la source native.
+ *
+ * Critère de rapprochement demandé : même nom OU même adresse normalisée.
+ * On ne fusionne que du natif VERS du SDK (jamais SDK↔SDK ni natif↔natif) afin
+ * de ne pas masquer par erreur deux imprimantes distinctes de même modèle.
+ */
+function collapseSdkDuplicates(list: DiscoveredPrinter[]): DiscoveredPrinter[] {
+  const sdkEntries = list.filter((p) => p.isSdk);
+  if (sdkEntries.length === 0) return list;
+
+  const result: DiscoveredPrinter[] = [];
+  for (const p of list) {
+    if (p.isSdk) {
+      result.push(p);
+      continue;
+    }
+    const match = sdkEntries.find((s) => sameAddress(s.address, p.address) || sameName(s.name, p.name));
+    if (match) {
+      // Fusionner la source native dans l'entrée SDK conservée.
+      match.discoveredBy = Array.from(new Set([...(match.discoveredBy ?? []), ...(p.discoveredBy ?? []), p.adapter]));
+      match.isConnected = match.isConnected || p.isConnected;
+      match.isDefault = match.isDefault || p.isDefault;
+      continue; // on supprime le doublon natif
+    }
+    result.push(p);
+  }
+  return result;
+}
+
+/** Adresse comparable cross-transport : minuscule, port retiré pour les IPv4. */
+function bareAddress(a: string): string {
+  const s = a.trim().toLowerCase();
+  return s.includes('.') ? s.replace(/:\d+$/, '') : s;
+}
+
+function sameAddress(a: string, b: string): boolean {
+  const na = bareAddress(a);
+  return na.length > 0 && na === bareAddress(b);
+}
+
+function sameName(a: string, b: string): boolean {
+  const na = a.trim().toLowerCase();
+  return na.length > 0 && na === b.trim().toLowerCase();
 }
 
 function dedupeSources(p: DiscoveredPrinter): typeof p.discoveredBy {

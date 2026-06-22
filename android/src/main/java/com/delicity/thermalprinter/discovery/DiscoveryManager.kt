@@ -129,8 +129,58 @@ class DiscoveryManager(
             winner.isConnected = existing.isConnected || p.isConnected
             byId[p.id] = winner
         }
-        return byId.values.sortedWith(
+        return collapseSdkDuplicates(byId.values.toList()).sortedWith(
             compareByDescending<DiscoveredPrinter> { AdapterPriority.score(it) }.thenBy { it.name },
         )
+    }
+
+    /**
+     * 2ᵉ passe : une même imprimante physique peut être remontée à la fois par
+     * son SDK fabricant ET par une source native générique sous un `id` différent
+     * (transport/adresse distincts) — typiquement une Epson visible aussi en
+     * Bluetooth classique. On garde alors l'entrée SDK (priorité produit) et on y
+     * fusionne la source native, au lieu d'afficher deux lignes.
+     *
+     * Rapprochement demandé : même nom OU même adresse normalisée. On ne fusionne
+     * que du natif VERS du SDK (jamais SDK↔SDK ni natif↔natif) pour ne pas masquer
+     * par erreur deux imprimantes distinctes de même modèle.
+     */
+    private fun collapseSdkDuplicates(list: List<DiscoveredPrinter>): List<DiscoveredPrinter> {
+        val sdkEntries = list.filter { it.adapter.isSdk }
+        if (sdkEntries.isEmpty()) return list
+
+        val result = mutableListOf<DiscoveredPrinter>()
+        for (p in list) {
+            if (p.adapter.isSdk) {
+                result.add(p)
+                continue
+            }
+            val match = sdkEntries.firstOrNull { sameAddress(it.address, p.address) || sameName(it.name, p.name) }
+            if (match != null) {
+                match.discoveredBy.addAll(p.discoveredBy)
+                match.discoveredBy.add(p.adapter)
+                match.isConnected = match.isConnected || p.isConnected
+                match.isDefault = match.isDefault || p.isDefault
+                continue // doublon natif supprimé
+            }
+            result.add(p)
+        }
+        return result
+    }
+
+    /** Adresse comparable cross-transport : minuscule, port retiré pour les IPv4. */
+    private fun bareAddress(a: String): String {
+        val s = a.trim().lowercase()
+        return if (s.contains('.')) s.replace(Regex(":\\d+$"), "") else s
+    }
+
+    private fun sameAddress(a: String, b: String): Boolean {
+        val na = bareAddress(a)
+        return na.isNotEmpty() && na == bareAddress(b)
+    }
+
+    private fun sameName(a: String, b: String): Boolean {
+        val na = a.trim().lowercase()
+        return na.isNotEmpty() && na == b.trim().lowercase()
     }
 }

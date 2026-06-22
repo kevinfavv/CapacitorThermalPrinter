@@ -26,6 +26,10 @@ enum class AdapterId(val value: String) {
     ZEBRA("zebra"),
     RAW_TCP("rawTcp");
 
+    /** Vrai si l'adapter est un SDK officiel fabricant (et non le natif générique). */
+    val isSdk: Boolean
+        get() = this == EPSON || this == STAR || this == BROTHER || this == ZEBRA
+
     companion object {
         fun from(v: String?): AdapterId =
             entries.firstOrNull { it.value == v } ?: ESCPOS
@@ -113,6 +117,7 @@ data class DiscoveredPrinter(
         put("address", address)
         capabilities?.let { put("capabilities", it.toJson()) }
         put("discoveredBy", JSONArray(discoveredBy.map { it.value }))
+        put("isSdk", adapter.isSdk)
         put("lastSeenAt", lastSeenAt)
         put("isDefault", isDefault)
         put("isConnected", isConnected)

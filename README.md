@@ -376,6 +376,7 @@ interface DiscoveredPrinter {
   address: string;             // "ip:port" | MAC | UUID
   capabilities?: Partial<PrinterCapabilities>;
   discoveredBy?: PrinterAdapterId[];
+  isSdk: boolean;              // true if driven by a vendor SDK (Epson/Star/Brother/Zebra)
   lastSeenAt: number;
   isDefault: boolean;
   isConnected: boolean;
@@ -721,6 +722,10 @@ Several sources run **in parallel**: Epson/Star/Brother/Zebra SDKs, TCP 9100 sca
 | ESC/POS confirmed over TCP | `escpos` | 600 |
 | BLE with a usable service | (BLE) | 500 |
 | Unidentified network device | `rawTcp` | 300 |
+
+**SDK wins over the native duplicate.** A printer can show up both through its vendor SDK **and** through a generic native source under a *different* `id` (e.g. an Epson also visible as a Bluetooth Classic device). A second merge pass collapses these: when a native entry shares the **same name OR the same (normalized) address** as an SDK entry, it is folded into the SDK entry (its `discoveredBy` / `isConnected` are merged) and only the SDK entry is returned. Merging only ever goes **native → SDK** (never SDK↔SDK nor native↔native), so two distinct printers of the same model are never hidden.
+
+The kept entry exposes **`isSdk: boolean`** — `true` when the printer is driven by a vendor SDK (Epson/Star/Brother/Zebra), `false` for the generic native integration (ESC/POS Bluetooth, raw TCP, BLE). Use it client-side to badge "SDK" vs "generic".
 
 ## Default printer & reconnection
 

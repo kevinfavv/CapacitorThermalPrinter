@@ -1,5 +1,13 @@
 import type { PrinterAdapterId, PrinterTransport } from '../core/enums';
 
+/** SDK officiels fabricants (priment sur l'intégration générique native). */
+const SDK_ADAPTERS: readonly PrinterAdapterId[] = ['epson', 'star', 'brother', 'zebra'];
+
+/** Vrai si l'adapter correspond à un SDK officiel fabricant (et non au natif générique). */
+export function isSdkAdapter(adapter: PrinterAdapterId): boolean {
+  return SDK_ADAPTERS.includes(adapter);
+}
+
 /**
  * Indice de découverte brut avant résolution d'adapter.
  * Chaque source de découverte produit un ou plusieurs `AdapterCandidate`.

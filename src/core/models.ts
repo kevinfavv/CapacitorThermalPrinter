@@ -62,6 +62,17 @@ export interface DiscoveredPrinter {
   capabilities?: Partial<PrinterCapabilities>;
   /** Source(s) de découverte ayant remonté cette imprimante (pour debug / fusion). */
   discoveredBy?: PrinterAdapterId[];
+  /**
+   * Vrai si l'imprimante est pilotée via un SDK officiel du fabricant
+   * (Epson / Star / Brother / Zebra) plutôt que via l'intégration générique
+   * native (ESC/POS Bluetooth, TCP brut, BLE).
+   *
+   * Quand une même imprimante est visible à la fois par son SDK et par une
+   * source native (ex : une Epson aussi détectée en Bluetooth classique), le
+   * moteur de fusion garde l'entrée SDK et positionne ce drapeau à `true`.
+   * Permet à l'app d'afficher clairement "intégration SDK" côté client.
+   */
+  isSdk: boolean;
   /** Timestamp (ms epoch) de dernière détection. */
   lastSeenAt: number;
   /** Vrai si c'est l'imprimante par défaut enregistrée. */

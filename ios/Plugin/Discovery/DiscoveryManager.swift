@@ -71,10 +71,59 @@ final class DiscoveryManager {
                 byId[p.id] = p
             }
         }
-        return byId.values.sorted {
+        return collapseSdkDuplicates(Array(byId.values)).sorted {
             let sa = AdapterPriority.score($0), sb = AdapterPriority.score($1)
             return sa != sb ? sa > sb : $0.name < $1.name
         }
+    }
+
+    /// 2ᵉ passe : une même imprimante physique peut être remontée à la fois par
+    /// son SDK fabricant ET par une source native générique sous un `id` différent
+    /// (transport/adresse distincts) — typiquement une Epson visible aussi en BLE.
+    /// On garde alors l'entrée SDK (priorité produit) et on y fusionne la source
+    /// native, au lieu d'afficher deux lignes.
+    ///
+    /// Rapprochement demandé : même nom OU même adresse normalisée. On ne fusionne
+    /// que du natif VERS du SDK (jamais SDK↔SDK ni natif↔natif) pour ne pas masquer
+    /// par erreur deux imprimantes distinctes de même modèle.
+    private func collapseSdkDuplicates(_ list: [DiscoveredPrinter]) -> [DiscoveredPrinter] {
+        let sdkIndices = list.indices.filter { list[$0].adapter.isSdk }
+        if sdkIndices.isEmpty { return list }
+
+        var merged = list
+        var result: [DiscoveredPrinter] = []
+        for p in list {
+            if p.adapter.isSdk { continue } // les entrées SDK sont émises depuis `merged`
+            if let mi = sdkIndices.first(where: {
+                sameAddress(merged[$0].address, p.address) || sameName(merged[$0].name, p.name)
+            }) {
+                merged[mi].discoveredBy.formUnion(p.discoveredBy)
+                merged[mi].discoveredBy.insert(p.adapter.rawValue)
+                merged[mi].isConnected = merged[mi].isConnected || p.isConnected
+                merged[mi].isDefault = merged[mi].isDefault || p.isDefault
+                continue // doublon natif supprimé
+            }
+            result.append(p)
+        }
+        // Entrées SDK (potentiellement enrichies) + entrées natives non rapprochées.
+        return sdkIndices.map { merged[$0] } + result
+    }
+
+    /// Adresse comparable cross-transport : minuscule, port retiré pour les IPv4.
+    private func bareAddress(_ a: String) -> String {
+        let s = a.trimmingCharacters(in: .whitespaces).lowercased()
+        guard s.contains(".") else { return s }
+        return s.replacingOccurrences(of: ":\\d+$", with: "", options: .regularExpression)
+    }
+
+    private func sameAddress(_ a: String, _ b: String) -> Bool {
+        let na = bareAddress(a)
+        return !na.isEmpty && na == bareAddress(b)
+    }
+
+    private func sameName(_ a: String, _ b: String) -> Bool {
+        let na = a.trimmingCharacters(in: .whitespaces).lowercased()
+        return !na.isEmpty && na == b.trimmingCharacters(in: .whitespaces).lowercased()
     }
 }
 
