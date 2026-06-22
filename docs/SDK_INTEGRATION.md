@@ -84,6 +84,27 @@ Follow the official StarXpand steps, in your Xcode app project:
 > ℹ️ You don't need to touch the `Podfile`: just adding the SPM package to your app is
 > enough for the plugin to pick Star up — Star support turns on by itself.
 
+5. **For Bluetooth (MFi) Star printers**, add the Star **protocol string** to your app's
+   `Info.plist` — otherwise iOS never surfaces the paired Star printer and discovery finds
+   **nothing over Bluetooth** (even though `getActiveSdks()` already reports
+   `star: available=true`). This is the #1 cause of "SDK installed but no Star printer found":
+   ```xml
+   <key>UISupportedExternalAccessoryProtocols</key>
+   <array><string>jp.star-m.starpro</string></array>
+   <key>NSBluetoothAlwaysUsageDescription</key>
+   <string>Discover and print to Bluetooth printers.</string>
+   ```
+   `jp.star-m.starpro` covers both **Bluetooth (classic MFi)** and **USB** Star printers
+   (required by StarXpand). If you already declare the key for another brand (Epson/Zebra),
+   just **add** `jp.star-m.starpro` to the existing `<array>` — don't replace the others.
+   Wi-Fi/LAN Star printers also need `NSLocalNetworkUsageDescription` + `NSBonjourServices`
+   (see the network-discovery note). Then **pair the printer in iOS Settings ▸ Bluetooth**
+   first, grant the Bluetooth prompt on first launch, and relaunch.
+
+   > ℹ️ Star is the **only** brand whose SDK auto-installs on iOS, so it's easy to forget the
+   > `Info.plist` step — the SDK compiles in and `getActiveSdks()` says `available=true`, yet
+   > Bluetooth discovery silently returns empty until this key is present.
+
 > ✅ Verified on a Capacitor 7 app + iOS simulator: after adding the SPM package,
 > `getActiveSdks()` reports `star: available=true` and Star discovery routes through the SDK.
 
