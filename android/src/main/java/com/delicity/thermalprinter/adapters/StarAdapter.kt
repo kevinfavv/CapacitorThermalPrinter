@@ -2,6 +2,7 @@ package com.delicity.thermalprinter.adapters
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
 import com.delicity.thermalprinter.image.TextRasterizer
 import com.delicity.thermalprinter.model.AdapterId
 import com.delicity.thermalprinter.model.DiscoveredPrinter
@@ -55,8 +56,14 @@ class StarAdapter(private val context: Context) : PrinterAdapter {
     /** Connexions ouvertes indexées par printerId. */
     private val connections = ConcurrentHashMap<String, StarPrinter>()
 
+    // Le SDK Star (stario10) exige API 26. Sur un terminal antérieur (ex. API 25),
+    // charger les classes stario10 — référencées en typé direct dans cet adapter —
+    // provoquerait un crash (VerifyError/NoClassDefFoundError) dès le 1er appel.
+    // On désactive donc Star sous Android 8.0 : discover(), connect(), print() et
+    // l'exposition SdkInfo s'appuient tous sur isAvailable() et l'ignoreront.
     override fun isAvailable(): Boolean =
-        EpsonAdapter.classExists("com.starmicronics.stario10.StarPrinter")
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            EpsonAdapter.classExists("com.starmicronics.stario10.StarPrinter")
 
     override fun supportsTextItems(): Boolean = true
 
