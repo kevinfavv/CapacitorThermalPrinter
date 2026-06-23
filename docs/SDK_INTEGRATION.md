@@ -236,14 +236,20 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother suppo
 1. Download the **ePOS SDK for iOS** — [direct download (Epson Download Center)](https://download-center.epson.com/download/?module_id=e5fde6cb-2f38-4bb3-b920-e53ee5b3190f%3A2.37.0&device_id=TM-m10&os=IOS&region=FR&language=fr)
    (or browse from [Epson Developers](https://epson.com/developers-products); Bluetooth MFi: see [MFi / ePOS SDK support](https://global.epson.com/products_and_drivers/tm/en/mfi.html)).
 2. The SDK archive contains three frameworks — take the **dynamic** one,
-   **`libepos2.xcframework`** (optionally also `libeposeasyselect.xcframework`, the
-   printer-selection helper). In Xcode, **drag and drop** it onto the **`App` ▸ Frameworks**
+   **`libepos2.xcframework`**. In Xcode, **drag and drop** it onto the **`App` ▸ Frameworks**
    group, and in the dialog **tick "Copy items if needed"** so the framework is copied into
-   the project (not just referenced from your Downloads folder). Leave it on **Embed & Sign**.
+   the project (not just referenced from your Downloads folder). Because it's a **dynamic**
+   framework, leave it on **Embed & Sign**.
    > ⚠️ Do **not** also add `libepos2-static.xcframework` — it's the *static* variant of
    > `libepos2` (an alternative, not a complement). Since the Capacitor Podfile uses
    > `use_frameworks!`, use the dynamic `libepos2.xcframework`; adding both causes duplicate
    > symbols.
+   > ⚠️ Optionally add `libeposeasyselect.xcframework` (the printer-selection helper) too — but
+   > it's a **static** library (it contains `libeposeasyselect.a`, not a `.framework`). Add it
+   > the same way, then in **`App` target ▸ General ▸ Frameworks, Libraries, and Embedded
+   > Content** set it to **Do Not Embed** (like Zebra below). Embedding a static library copies
+   > the `.a` into `App.app/Frameworks/`, which App Store Connect **rejects** with *"Invalid
+   > bundle structure … binary file is not permitted"*.
 3. That's all on the app side: once `libepos2.xcframework` is on the `App` target, Epson
    support turns on by itself.
    > ⚠️ If your SDK version exposes a **different module name**, adjust it in
@@ -335,10 +341,18 @@ Then run `pod install` from `ios/App/` (or `npx cap sync ios`) — Brother suppo
 
 ## Enable framework signing (iOS)
 
-After adding a manufacturer `.xcframework` to the `App` target, make sure the framework is
-**signed** by your app. In Xcode, open the **`App`** target ▸ **General** ▸ **Frameworks,
-Libraries, and Embedded Content**, and set the framework's dropdown to **Embed & Sign**
-(not "Do Not Embed" / "Embed Without Signing"). Otherwise the build can fail code-signing or
-the app may be rejected at install.
+The correct setting depends on whether the `.xcframework` is **dynamic** or **static** —
+check what it contains: a `.framework` inside is dynamic, a `.a` inside is static.
+
+- **Dynamic** framework (e.g. Epson `libepos2.xcframework`, which contains `libepos2.framework`):
+  it must be **signed** by your app. In Xcode, open the **`App`** target ▸ **General** ▸
+  **Frameworks, Libraries, and Embedded Content**, and set its dropdown to **Embed & Sign**
+  (not "Do Not Embed" / "Embed Without Signing"). Otherwise the build can fail code-signing or
+  the app may be rejected at install.
+- **Static** library (e.g. Zebra `ZSDK_API.xcframework`, Epson `libeposeasyselect.xcframework`,
+  which contain a `.a`): set it to **Do Not Embed**. A static library is linked directly into
+  the app binary — there's nothing to embed or sign. Embedding it copies the `.a` into
+  `App.app/Frameworks/`, which App Store Connect **rejects** (*"the Swift runtime libraries are
+  the only files permitted in that directory"* / *"binary file is not permitted"*).
 
 ![Enabling framework signing in Xcode](enable_singin.gif)
