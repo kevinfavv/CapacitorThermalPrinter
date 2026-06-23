@@ -4,6 +4,24 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [8.1.0]
+
+### Ajouté
+- **Exception d'agrégation Zebra — fallback ESC/POS exposé.** Quand une imprimante Zebra
+  est aussi découverte par une source native générique (Bluetooth classique / BLE), son
+  entrée native n'est plus fusionnée dans l'entrée SDK : les deux lignes sont conservées et
+  sélectionnables. L'utilisateur garde le chemin Zebra (ZPL, prioritaire) **et** un chemin
+  d'impression ESC/POS « normal » de secours — utile si l'imprimante refuse le ZPL ou est
+  configurée en `line_print`. (Android, iOS, Web.)
+
+### Corrigé
+- **Zebra : auto-correction du mode `line_print`.** Certaines Zebra imprimaient littéralement
+  la sonde de détection de langage du SDK (`! U1 getvar "appl.name"`) au lieu de l'exécuter,
+  ne produisant aucun ticket. À la connexion, le plugin force désormais
+  `device.languages = hybrid_xml_zpl` (premier octet envoyé, persistant et non destructif) et
+  récupère l'imprimante via `getInstance(PrinterLanguage.ZPL, …)` — la sonde n'est donc plus
+  émise ni imprimée. (Android.)
+
 ## [7.1.4]
 
 ### Ajouté
