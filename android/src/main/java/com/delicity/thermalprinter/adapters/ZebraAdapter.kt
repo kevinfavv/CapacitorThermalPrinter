@@ -2,6 +2,7 @@ package com.delicity.thermalprinter.adapters
 
 import android.content.Context
 import android.graphics.Bitmap
+import kotlinx.coroutines.delay
 import com.delicity.thermalprinter.model.AdapterId
 import com.delicity.thermalprinter.model.DiscoveredPrinter
 import com.delicity.thermalprinter.model.ErrorCode
@@ -99,7 +100,47 @@ class ZebraAdapter(private val context: Context) : PrinterAdapter {
         } catch (e: Throwable) {
             throw PrinterException(ErrorCode.CONNECTION_FAILED, "Connexion Zebra échouée: ${profile.address}", e.message, retryable = true)
         }
+        // Auto-correction : certaines Zebra sont configurées en `line_print` (elles IMPRIMENT
+        // littéralement les commandes reçues, ex. la sonde de détection de langage du SDK
+        // `! U1 getvar "appl.name"`, au lieu de les interpréter → rien d'imprimable ne sort).
+        // On force `device.languages` en ZPL dès l'ouverture, comme TOUT PREMIER octet envoyé
+        // sur une connexion propre (la sonde du SDK arrive elle en milieu de flux). Best-effort,
+        // persistant et non destructif (`hybrid_xml_zpl` conserve ZPL + XML).
+        forceZplLanguage(connection)
         cache[profile.id] = connection
+    }
+
+    /** Sort l'imprimante du mode line_print en forçant un langage ZPL-compatible. */
+    private suspend fun forceZplLanguage(connection: Any) {
+        val ok = runCatching {
+            val cmd = "! U1 setvar \"device.languages\" \"hybrid_xml_zpl\"\r\n".toByteArray(Charsets.US_ASCII)
+            SdkReflect.call(connection, "write", arrayOf(ByteArray::class.java), arrayOf<Any?>(cmd))
+        }.isSuccess
+        // Le changement de langage n'est pas instantané : laisser l'imprimante l'appliquer
+        // avant le premier `getInstance`/impression.
+        if (ok) delay(LANGUAGE_SWITCH_DELAY_MS)
+    }
+
+    /**
+     * Récupère le `ZebraPrinter` en FORÇANT le langage ZPL : évite l'overload auto-détection
+     * `getInstance(Connection)` qui envoie la sonde `! U1 getvar "appl.name"` (imprimée
+     * littéralement si l'imprimante n'interprète pas le SGD). Fallback auto-détection si
+     * l'enum `PrinterLanguage` est introuvable (vieille version de SDK).
+     */
+    private fun zebraPrinter(connection: Any): Any {
+        val zpl = SdkReflect.enumValue(PRINTER_LANGUAGE, "ZPL")
+        val langClass = SdkReflect.classOrNull(PRINTER_LANGUAGE)
+        val connClass = SdkReflect.classOrNull(CONNECTION)!!
+        if (zpl != null && langClass != null) {
+            SdkReflect.callStatic(
+                PRINTER_FACTORY, "getInstance",
+                arrayOf(langClass, connClass), arrayOf(zpl, connection),
+            )?.let { return it }
+        }
+        return SdkReflect.callStatic(
+            PRINTER_FACTORY, "getInstance",
+            arrayOf(connClass), arrayOf(connection),
+        ) ?: error("ZebraPrinterFactory.getInstance null")
     }
 
     override fun isConnected(printerId: String): Boolean {
@@ -119,10 +160,7 @@ class ZebraAdapter(private val context: Context) : PrinterAdapter {
         val connection = cache[profile.id]
             ?: throw PrinterException(ErrorCode.CONNECTION_FAILED, "Zebra non connecté: ${profile.id}")
         try {
-            val printer = SdkReflect.callStatic(
-                PRINTER_FACTORY, "getInstance",
-                arrayOf(SdkReflect.classOrNull(CONNECTION)!!), arrayOf(connection),
-            ) ?: error("ZebraPrinterFactory.getInstance null")
+            val printer = zebraPrinter(connection)
             val graphics = SdkReflect.call(printer, "getGraphicsUtil") ?: error("getGraphicsUtil null")
             val zebraImage = SdkReflect.callStatic(
                 IMAGE_FACTORY, "getImage",
@@ -151,10 +189,7 @@ class ZebraAdapter(private val context: Context) : PrinterAdapter {
         val connection = cache[profile.id]
             ?: return PrinterStatus(profile.id, "disconnected", online = false, paper = "unknown")
         return try {
-            val printer = SdkReflect.callStatic(
-                PRINTER_FACTORY, "getInstance",
-                arrayOf(SdkReflect.classOrNull(CONNECTION)!!), arrayOf(connection),
-            ) ?: error("getInstance null")
+            val printer = zebraPrinter(connection)
             val status = SdkReflect.call(printer, "getCurrentStatus") ?: error("getCurrentStatus null")
             val ready = (SdkReflect.field(status, "isReadyToPrint") as? Boolean) ?: false
             val paperOut = (SdkReflect.field(status, "isPaperOut") as? Boolean) ?: false
@@ -201,6 +236,8 @@ class ZebraAdapter(private val context: Context) : PrinterAdapter {
         private const val TCP_CONNECTION = "com.zebra.sdk.comm.TcpConnection"
         private const val BT_CONNECTION = "com.zebra.sdk.comm.BluetoothConnection"
         private const val PRINTER_FACTORY = "com.zebra.sdk.printer.ZebraPrinterFactory"
+        private const val PRINTER_LANGUAGE = "com.zebra.sdk.printer.PrinterLanguage"
+        private const val LANGUAGE_SWITCH_DELAY_MS = 400L
         private const val IMAGE_FACTORY = "com.zebra.sdk.graphics.ZebraImageFactory"
         private const val IMAGE_I = "com.zebra.sdk.graphics.ZebraImageI"
         private const val NETWORK_DISCOVERER = "com.zebra.sdk.printer.discovery.NetworkDiscoverer"
