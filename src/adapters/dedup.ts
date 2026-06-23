@@ -104,6 +104,13 @@ function collapseSdkDuplicates(list: DiscoveredPrinter[]): DiscoveredPrinter[] {
     }
     const match = sdkEntries.find((s) => sameAddress(s.address, p.address) || sameName(s.name, p.name));
     if (match) {
+      // Exception Zebra : on NE fusionne PAS le doublon natif (BLE/Classic). Une Zebra
+      // peut être en `line_print` ou refuser le ZPL : on garde l'entrée native générique
+      // comme chemin d'impression ESC/POS « normal »/de secours, EN PLUS de l'entrée SDK.
+      if (match.adapter === 'zebra') {
+        result.push(p);
+        continue;
+      }
       // Fusionner la source native dans l'entrée SDK conservée.
       match.discoveredBy = Array.from(new Set([...(match.discoveredBy ?? []), ...(p.discoveredBy ?? []), p.adapter]));
       match.isConnected = match.isConnected || p.isConnected;

@@ -97,6 +97,13 @@ final class DiscoveryManager {
             if let mi = sdkIndices.first(where: {
                 sameAddress(merged[$0].address, p.address) || sameName(merged[$0].name, p.name)
             }) {
+                // Exception Zebra : on NE fusionne PAS le doublon natif (BLE/Classic). Une Zebra
+                // peut être en `line_print` ou refuser le ZPL : on garde l'entrée native générique
+                // comme chemin d'impression ESC/POS « normal »/de secours, EN PLUS de l'entrée SDK.
+                if merged[mi].adapter == .zebra {
+                    result.append(p)
+                    continue
+                }
                 merged[mi].discoveredBy.formUnion(p.discoveredBy)
                 merged[mi].discoveredBy.insert(p.adapter.rawValue)
                 merged[mi].isConnected = merged[mi].isConnected || p.isConnected

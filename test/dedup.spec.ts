@@ -155,6 +155,35 @@ describe('mergeDiscoveries', () => {
     expect(new Set(merged[0].discoveredBy)).toEqual(new Set(['epson', 'rawTcp']));
   });
 
+  it('exception Zebra : conserve le doublon natif (fallback ESC/POS) au lieu de le fusionner', () => {
+    const merged = mergeDiscoveries(
+      [
+        printer({
+          id: 'zebra:AA:BB:CC:DD:EE:FF',
+          name: 'Zebra ZQ630',
+          adapter: 'zebra',
+          brand: 'Zebra',
+          transport: 'bluetooth',
+          address: 'AA:BB:CC:DD:EE:FF',
+          discoveredBy: ['zebra'],
+          isSdk: true,
+        }),
+        printer({
+          id: 'bluetooth:AA:BB:CC:DD:EE:FF',
+          name: 'Zebra ZQ630',
+          adapter: 'escpos',
+          transport: 'bluetooth',
+          address: 'AA:BB:CC:DD:EE:FF',
+          discoveredBy: ['escpos'],
+        }),
+      ],
+      (p) => (p.adapter === 'zebra' ? 1000 : 620),
+    );
+    expect(merged).toHaveLength(2);
+    expect(merged.find((p) => p.adapter === 'zebra')).toBeDefined();
+    expect(merged.find((p) => p.adapter === 'escpos')).toBeDefined();
+  });
+
   it('ne fusionne pas deux entrées natives de même nom (pas de SDK)', () => {
     const merged = mergeDiscoveries(
       [

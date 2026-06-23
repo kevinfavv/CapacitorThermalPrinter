@@ -3,6 +3,7 @@ package com.delicity.thermalprinter.discovery
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import com.delicity.thermalprinter.adapters.PrinterAdapter
+import com.delicity.thermalprinter.model.AdapterId
 import com.delicity.thermalprinter.model.DiscoveredPrinter
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -157,6 +158,14 @@ class DiscoveryManager(
             }
             val match = sdkEntries.firstOrNull { sameAddress(it.address, p.address) || sameName(it.name, p.name) }
             if (match != null) {
+                // Exception Zebra : on NE fusionne PAS le doublon natif (BLE/Classic). Une Zebra
+                // peut être configurée en `line_print` ou refuser le ZPL : on conserve donc
+                // l'entrée native générique comme chemin d'impression ESC/POS « normal »/de
+                // secours, EN PLUS de l'entrée SDK Zebra. L'utilisateur garde les deux choix.
+                if (match.adapter == AdapterId.ZEBRA) {
+                    result.add(p)
+                    continue
+                }
                 match.discoveredBy.addAll(p.discoveredBy)
                 match.discoveredBy.add(p.adapter)
                 match.isConnected = match.isConnected || p.isConnected
