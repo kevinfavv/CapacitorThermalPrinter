@@ -356,3 +356,71 @@ check what it contains: a `.framework` inside is dynamic, a `.a` inside is stati
   the only files permitted in that directory"* / *"binary file is not permitted"*).
 
 ![Enabling framework signing in Xcode](enable_singin.gif)
+
+---
+
+## App Store submission: MFi Product Plan whitelisting (iOS)
+
+> **Applies only to Bluetooth/USB (classic MFi) printers** — i.e. any brand you declare under
+> `UISupportedExternalAccessoryProtocols` in `Info.plist` (`jp.star-m.starpro`,
+> `com.epson.escpos`, `com.zebra.rawport`). **Wi-Fi/LAN printers are not affected** and need
+> none of this.
+
+Any app that talks to an MFi accessory through Apple's **External Accessory framework** must be
+**whitelisted in the accessory manufacturer's MFi Product Plan** before App Review will pass.
+If it isn't, App Store Connect rejects the build (or asks for it during review) with a message
+like:
+
+> *"…contact the accessory manufacturer to request the app be added to the MFi Product Plan
+> form … provide the accessory's MFi Product Plan ID (PPID) … enter this information in the
+> Notes section…"*
+
+The **PPID (MFi Product Plan ID)** is a **10-digit number** Apple assigns to a given accessory
+**model**. You can't invent it — the **manufacturer** sends it to you after whitelisting your
+app. You then paste it into the App Store Connect **App Review Information ▸ Notes**.
+
+### The process is the same for every brand (3 steps)
+
+1. **Send your app info to the manufacturer** (form/email below). They need: **app name**,
+   **version**, **Bundle ID**, the **EA protocol string(s)**, the **printer model(s)**, and an
+   **app description**.
+2. The manufacturer **tests and submits your app to Apple's MFi registry** (= "added to the MFi
+   Product Plan form").
+3. The manufacturer returns the **PPID** → you add it to the App Store Connect **Notes** and
+   (re)submit / reply to the reviewer. **No new binary is required** for the Notes update.
+
+### Where to submit, per declared protocol
+
+| Protocol (`Info.plist`) | Brand | How to request whitelisting |
+|---|---|---|
+| `com.zebra.rawport` | Zebra | Email **iOSApp@zebra.com** — see [How to whitelist your iOS app for Zebra printers](https://developer.zebra.com/blog/how-whitelist-your-ios-apps-zebra-printers) / [support article](https://supportcommunity.zebra.com/s/article/000027738?language=en_US) |
+| `com.epson.escpos` | Epson | Application Information Sheet form: **https://c4b.epson-biz.com/modules/ais/** — see [Epson MFi iOS approval](https://epson.com/Support/wa00791) (≈5 business days) |
+| `jp.star-m.starpro` | Star | Registration form: **https://star-m.jp/eng/support/s_print/app_regist.html** — see [Star: submitting an app to the App Store](https://starmicronics.com/help-center/knowledge-base/how-can-i-submit-an-app-to-apples-app-store/) |
+
+> ⚠️ You must whitelist **every** MFi protocol you declare in `Info.plist`. If you only ship one
+> brand over Bluetooth, **remove the unused protocol strings** from the `<array>` so Apple
+> doesn't ask for PPIDs you can't provide (that change does require a new binary).
+
+### What to put in App Store Connect ▸ App Review Information ▸ Notes
+
+Recommended format (Star's convention): `MFI PPID ****-****`. List one line per protocol you
+declare:
+
+```
+This app communicates with MFi-certified printers via the External Accessory
+framework. The following EA protocols are declared and used:
+
+- com.zebra.rawport  (Zebra printers)          - MFI PPID **********
+- com.epson.escpos   (Epson printers)          - MFI PPID **********
+- jp.star-m.starpro  (Star Micronics printers) - MFI PPID **********
+
+The app has been added to the MFi Product Plan form by the accessory
+manufacturer(s). No new binary is required - please proceed with the review.
+```
+
+To edit: App Store Connect ▸ **My Apps** ▸ select the app ▸ the version on the left ▸ scroll to
+**App Review Information** ▸ update **Notes** ▸ **Save** ▸ **Submit for Review** (or reply in the
+**Resolution Center** if the build is already in review — no resubmission needed).
+
+> ℹ️ Allow ~1–2 weeks per manufacturer for the whitelisting round-trip. Start this **before**
+> your planned release date.

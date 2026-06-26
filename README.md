@@ -772,6 +772,16 @@ catch (e) {
 > On iOS, for Bluetooth: **BLE (generic) or MFi (brand SDK)** — never generic Classic/SPP.
 > Wi-Fi works for everyone.
 
+> ⚠️ **App Store submission (MFi printers).** If you ship a **Bluetooth/USB MFi** printer
+> (any brand declared under `UISupportedExternalAccessoryProtocols` in `Info.plist` —
+> `jp.star-m.starpro`, `com.epson.escpos`, `com.zebra.rawport`), Apple **rejects** the app
+> until it is **whitelisted in the manufacturer's MFi Product Plan** and you provide the
+> accessory's **PPID (MFi Product Plan ID)** in App Store Connect ▸ *App Review Information ▸
+> Notes*. This is a manufacturer round-trip (≈1–2 weeks per brand) — **start it before your
+> release date**. Full step-by-step (per-brand forms, what to send, Notes template):
+> [SDK integration ▸ App Store submission: MFi Product Plan whitelisting](docs/SDK_INTEGRATION.md#app-store-submission-mfi-product-plan-whitelisting-ios).
+> Wi-Fi/LAN printers are **not** affected.
+
 ## Image cache & logs/diagnostics
 
 - **Cache**: `url` images are downloaded into `cache/thermal-images/` (key = URL hash, 32 MB quota, LRU eviction). The `filePath` mode remains the most reliable. Set `image.forceFetch: true` to bypass the cache and always re-download (the fresh file then replaces the cache entry).
