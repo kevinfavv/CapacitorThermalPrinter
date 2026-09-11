@@ -3,6 +3,7 @@ package com.delicity.thermalprinter.discovery
 import android.bluetooth.BluetoothAdapter
 import android.content.Context
 import com.delicity.thermalprinter.adapters.PrinterAdapter
+import com.delicity.thermalprinter.adapters.UsbAdapter
 import com.delicity.thermalprinter.model.AdapterId
 import com.delicity.thermalprinter.model.DiscoveredPrinter
 import kotlinx.coroutines.async
@@ -104,6 +105,20 @@ class DiscoveryManager(
                 runCatching {
                     BleScanner(context, btAdapter).scan(options.timeoutMs, collect)
                 }.onFailure { failed.add("ble") }
+                Unit
+            }
+        }
+
+        // --- Source USB Host (Android) ---
+        if (enabled("usb")) {
+            jobs += async {
+                runCatching {
+                    adapters.filterIsInstance<UsbAdapter>().forEach { usbAdapter ->
+                        if (usbAdapter.isAvailable()) {
+                            usbAdapter.discover(options.timeoutMs, collect)
+                        }
+                    }
+                }.onFailure { failed.add("usb") }
                 Unit
             }
         }

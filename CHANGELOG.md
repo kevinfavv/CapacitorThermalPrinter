@@ -4,6 +4,23 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [Unreleased]
+
+### Corrigé
+- **Android USB : la découverte USB n'était jamais appelée depuis `DiscoveryManager`.**
+  Le commentaire d'en-tête liste bien `UsbAdapter.discover (optionnel)` comme source,
+  et `UsbAdapter.discover(timeoutMs, onFound)` est implémenté (énumération de
+  `UsbManager.deviceList`, filtre classe imprimante USB 7). Mais la boucle
+  `for (adapter in adapters)` de `DiscoveryManager.discover()` ne mappait que les
+  SDK fabricants (`epson|star|brother|zebra`) via `when (adapter.id.value)` et
+  `continue`ait pour tout le reste — l'`UsbAdapter` (dont `id = ESCPOS`) tombait dans
+  ce trou. Résultat : côté client, aucune imprimante USB ne remontait dans
+  `discoverPrinters({ sources: ['usb'] })` — impossible d'obtenir l'`id` d'une
+  imprimante USB pour la connecter, sauf via un profil déjà persisté. Ajout d'un
+  bloc `--- Source USB Host (Android) ---` symétrique aux blocs TCP/Bluetooth/BLE,
+  filtrant les adapters par type `UsbAdapter` et appelant leur `discover()` sous
+  `runCatching`. Validé sur AX-5 + NCR7748 + Bixolon (Powered USB, classe 7).
+
 ## [8.3.0]
 
 ### Corrigé
