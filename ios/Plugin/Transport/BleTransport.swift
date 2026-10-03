@@ -20,6 +20,8 @@ final class BleManager: NSObject {
         CBUUID(string: "FF00"), // FF02 en écriture
         CBUUID(string: "49535343-FE7D-4AE5-8FA9-9FAFD205E455"), // Microchip transparent UART
         CBUUID(string: "E7810A71-73AE-499D-8C15-FAA9AEF0C3F2"),
+        CBUUID(string: "FEE7"), // imprimantes thermiques génériques (TP85H…), écriture via service GATT
+        CBUUID(string: "AE30"), // imprimantes BLE génériques (AE01 en écriture)
     ]
 
     private var central: CBCentralManager!
