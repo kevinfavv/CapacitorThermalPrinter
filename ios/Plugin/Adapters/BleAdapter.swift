@@ -58,7 +58,10 @@ final class BleAdapter: PrinterAdapter {
 
     func printImage(_ profile: PrinterProfile, image: UIImage, options: RenderOptions) async throws -> Int {
         let mono = try ImageProcessor.toMono(image, options: options)
-        let raster = ImageProcessor.encodeEscPosRaster(mono)
+        var raster = ImageProcessor.encodeEscPosRaster(mono)
+        if BleManager.shared.supportsCompactRaster(profile.address) {
+            raster = EscPosCommands.compactRaster(raster) // lignes blanches -> avance papier
+        }
         let job = EscPosCommands.buildJob(
             raster: raster, align: options.align, feedLines: options.feedLines,
             cut: options.cut && profile.capabilities.supportsCut,

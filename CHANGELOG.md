@@ -4,6 +4,32 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [8.6.0]
+
+### Ajouté
+- **iOS : scan réseau TCP 9100 du /24 courant** (miroir du `TcpScanner` Android), en plus de
+  Bonjour. Les imprimantes ESC/POS génériques qui ne publient aucun service mDNS (TP85H-V,
+  Xprinter…) restaient introuvables sur iPhone/iPad en Wi-Fi/Ethernet. Respecte `networkCidr`
+  et `tcpPorts` ; source `tcp`.
+- **iOS BLE : contrôle de flux par crédits** (puces Jieli, TP85H-V) : abonnement à `FF03`,
+  un paquet envoyé par crédit reçu (`01 n`), taille de paquet annoncée (`02 lo hi`). Repli
+  automatique sur l'ancien pacing si l'imprimante n'envoie aucun crédit.
+
+### Corrigé
+- **iOS BLE : la TP85H-V (et toute imprimante n'annonçant que `FEE7`) était introuvable ou
+  n'imprimait rien.** Le canal d'écriture était « la première caractéristique inscriptible
+  découverte » (ordre GATT non déterministe), pouvant viser un canal de contrôle (`FEE7/FEC7`,
+  Microchip `6DAA`). Il est désormais choisi dans une liste ordonnée de canaux connus
+  (`18F0/2AF1`, `FF00/FF02`, …) après découverte de tous les services.
+- **iOS BLE : impression lente / bandes blanches sur la TP85H-V.** Écriture sans accusé sur
+  `FF02` (~3 → ~11 Ko/s, plafond de l'imprimante) et lignes blanches du raster envoyées en
+  bandes larges d'un octet (rendu identique, ~45 % d'octets en moins) : ticket réel 576×1364
+  imprimé en ~5 s au lieu de ~35 s. Limité à ce canal validé : les autres imprimantes BLE
+  gardent leur comportement.
+- **iOS BLE : un job pouvait rester suspendu indéfiniment** si l'imprimante se déconnectait
+  pendant l'impression (accusé d'écriture jamais reçu) : les attentes échouent désormais en
+  `CONNECTION_FAILED` (retryable).
+
 ## [8.5.2]
 
 ### Corrigé

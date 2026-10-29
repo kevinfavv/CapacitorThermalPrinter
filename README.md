@@ -772,10 +772,17 @@ catch (e) {
   BT printer (visible but un-connectable in iOS Settings) **is not addressable** — unless it
   also exposes a BLE service (many cheap printers are Classic **+** BLE).
 - ✅ **Generic BLE** (CoreBluetooth) — the plugin ships a generic BLE adapter that scans known
-  ESC/POS BLE services, connects and prints. ✅📱 **verified on iPhone** (MP210: logo + text + QR).
+  ESC/POS BLE services, connects and prints. ✅📱 **verified on iPhone** (MP210: logo + text + QR;
+  TP85H-V: receipt image). The print channel is picked from a ranked list of known
+  (service, characteristic) pairs, never a control channel (WeChat `FEE7`, Microchip control);
+  printers that advertise only `FEE7` (TP85H-V) are found when they have a name. On the TP85H-V
+  channel (`FF00/FF02`): write-without-response with the printer's **credit flow control**
+  (`FF03`), and blank raster rows sent as 1-byte-wide bands (same layout, ~45 % fewer bytes).
 - ✅ **MFi manufacturer SDKs** (Epson/Star/Brother/Zebra) for Bluetooth/MFi. ✅📱 **Epson verified
   on iPhone** over Bluetooth (MFi). Requires the brand's MFi protocol string in `Info.plist`.
-- ✅ **Wi-Fi TCP** (port 9100) via `Network.framework` → triggers the **Local Network** prompt.
+- ✅ **Wi-Fi / Ethernet TCP** (port 9100) via `Network.framework` → triggers the **Local Network**
+  prompt. Discovery = Bonjour **+ a TCP 9100 scan of the current /24** (since 8.6.0, like
+  Android), so generic ESC/POS printers that publish no mDNS service (TP85H-V, Xprinter…) show up.
 - ✅ **Epson USB (MFi)** via the ePOS2 SDK — only for Epson models certified to connect to an
   iPhone/iPad over USB (typically the USB-C ones, e.g. TM-m30II/III). Same `com.epson.escpos`
   protocol string as Bluetooth. A non-MFi USB printer (e.g. TM-T20II over USB-B) is invisible
@@ -784,7 +791,9 @@ catch (e) {
   (check the model spec sheet, e.g. mC-Print3). Same `jp.star-m.starpro` protocol string as Bluetooth.
   ⚠️ Not yet verified on device.
 - ❌ **Brother, Zebra: no USB on iOS** (their iOS SDKs only offer Wi-Fi and Bluetooth).
-- ❌ No generic USB host (generic ESC/POS over USB is Android only).
+- ❌ No generic USB host (generic ESC/POS over USB is Android only). iOS/iPadOS gives apps no
+  access to a non-MFi USB device: a generic printer such as the TP85H-V must use BLE or the
+  network on iPhone/iPad.
 
 > On iOS, for Bluetooth: **BLE (generic) or MFi (brand SDK)** — never generic Classic/SPP.
 > Wi-Fi works for everyone.

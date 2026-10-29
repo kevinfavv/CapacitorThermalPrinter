@@ -47,12 +47,15 @@ final class DiscoveryManager {
                     group.addTask { await adapter.discover(timeoutMs: options.timeoutMs, onFound: collect) }
                 }
             }
-            // Bonjour réseau
+            // Réseau : Bonjour (imprimantes qui publient un service) + scan 9100 du /24
+            // (ESC/POS génériques sans mDNS). BLE : via BleAdapter (source "ble").
             if enabled("tcp") {
                 group.addTask { await BonjourScanner().scan(timeoutMs: options.timeoutMs, onFound: collect) }
+                group.addTask {
+                    await TcpScanner().scan(timeoutMs: options.timeoutMs, ports: options.tcpPorts,
+                                            networkCidr: options.networkCidr, onFound: collect)
+                }
             }
-            // BLE (optionnel)
-            // if enabled("ble") { group.addTask { await BleScanner().scan(...) } }
         }
 
         return (merge(buffer.snapshot()), failed)
