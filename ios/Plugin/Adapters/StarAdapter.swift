@@ -3,6 +3,7 @@ import UIKit
 
 #if canImport(StarIO10)
 import StarIO10
+import ExternalAccessory
 #endif
 
 /// Adapter Star iOS basé sur StarXpand SDK (StarIO10).
@@ -26,6 +27,25 @@ final class StarAdapter: PrinterAdapter {
     /// Délégué de découverte retenu le temps du scan.
     private var discoveryDelegate: StarDiscoveryDelegate?
     private var discoveryManager: StarDeviceDiscoveryManager?
+    private var accessoryObserver: NSObjectProtocol?
+
+    init() {
+        // Star Bluetooth/USB (MFi) : une imprimante éteinte puis rallumée revient avec une
+        // NOUVELLE session iOS ; l'ancien StarPrinter reste ouvert mais ne répond plus
+        // ("Request timed out" puis "Initialize failed" à chaque job). On l'oublie dès que
+        // iOS signale la déconnexion : le job suivant rouvre une connexion propre.
+        EAAccessoryManager.shared().registerForLocalNotifications()
+        accessoryObserver = NotificationCenter.default.addObserver(
+            forName: .EAAccessoryDidDisconnect, object: nil, queue: nil
+        ) { [weak self] note in
+            guard let serial = (note.userInfo?[EAAccessoryKey] as? EAAccessory)?.serialNumber, !serial.isEmpty else { return }
+            self?.dropSessions(identifier: serial)
+        }
+    }
+
+    deinit {
+        if let o = accessoryObserver { NotificationCenter.default.removeObserver(o) }
+    }
     #endif
 
     func isAvailable() -> Bool {
@@ -115,7 +135,6 @@ final class StarAdapter: PrinterAdapter {
 
     func printImage(_ profile: PrinterProfile, image: UIImage, options: RenderOptions) async throws -> Int {
         #if canImport(StarIO10)
-        let printer = try requireConnected(profile)
         let printerBuilder = StarXpandCommand.PrinterBuilder()
             .styleAlignment(Self.alignment(for: options.align))
             .actionPrintImage(StarXpandCommand.Printer.ImageParameter(image: image, width: max(8, profile.capabilities.printableDots)))
@@ -130,7 +149,7 @@ final class StarAdapter: PrinterAdapter {
 
         var sent = 0
         for _ in 0..<max(1, options.copies) {
-            try await send(printer, commands)
+            try await send(profile, commands)
             sent += commands.count
         }
         return sent
@@ -141,7 +160,6 @@ final class StarAdapter: PrinterAdapter {
 
     func printItems(_ profile: PrinterProfile, items: [PrintItem], defaultCodePage: String, cut: Bool, feedLines: Int) async throws -> Int {
         #if canImport(StarIO10)
-        let printer = try requireConnected(profile)
         let pb = StarXpandCommand.PrinterBuilder()
         if Self.isRasterOnly(profile.model) {
             // Famille TSP100 (TSP100/TSP143/III/IV) : imprimantes GRAPHICS-ONLY, sans police
@@ -160,7 +178,7 @@ final class StarAdapter: PrinterAdapter {
         let commands = StarXpandCommand.StarXpandCommandBuilder()
             .addDocument(StarXpandCommand.DocumentBuilder().addPrinter(pb))
             .getCommands()
-        try await send(printer, commands)
+        try await send(profile, commands)
         return commands.count
         #else
         throw PrinterError(.SDK_NOT_AVAILABLE, "SDK Star (StarIO10) absent")
@@ -203,9 +221,73 @@ final class StarAdapter: PrinterAdapter {
         return printer
     }
 
-    private func send(_ printer: StarPrinter, _ commands: String) async throws {
-        do { try await printer.print(command: commands) }
-        catch { throw PrinterError(.PRINT_FAILED, "Impression Star échouée", detail: "\(error)", retryable: true) }
+    /// Envoie le job ; si la session ne répond plus (imprimante rallumée, lien Bluetooth
+    /// coupé), rouvre une connexion neuve et renvoie le job UNE fois. Papier/capot (statut
+    /// connu) et commandes invalides ne sont pas renvoyés : la session est saine.
+    private func send(_ profile: PrinterProfile, _ commands: String) async throws {
+        let printer = try requireConnected(profile)
+        do {
+            try await printer.print(command: commands)
+            return
+        } catch {
+            guard Self.isSessionLost(error) else {
+                throw PrinterError(.PRINT_FAILED, "Impression Star échouée", detail: "\(error)", retryable: true)
+            }
+            Logger.shared.log("star", "session-lost-reopen", ["id": profile.id, "error": "\(error)"])
+            guard let fresh = await reopen(profile, replacing: printer) else {
+                throw PrinterError(.PRINT_FAILED, "Impression Star échouée", detail: "\(error)", retryable: true)
+            }
+            do { try await fresh.print(command: commands) }
+            catch { throw PrinterError(.PRINT_FAILED, "Impression Star échouée", detail: "\(error)", retryable: true) }
+        }
+    }
+
+    /// Erreur de transport (session morte) plutôt qu'état de l'imprimante. `unprintable` sans
+    /// statut = "Initialize failed." : le SDK n'a même pas pu lire l'imprimante.
+    private static func isSessionLost(_ error: Error) -> Bool {
+        guard let e = error as? StarIO10Error else { return false }
+        switch e {
+        case .communication, .illegalDeviceState, .notFound, .badResponse, .unknown: return true
+        case let .unprintable(_, _, status): return status == nil
+        default: return false
+        }
+    }
+
+    /// Ferme la session morte et en ouvre une neuve (l'accessoire peut mettre quelques
+    /// secondes à réapparaître après un redémarrage de l'imprimante).
+    private func reopen(_ profile: PrinterProfile, replacing old: StarPrinter) async -> StarPrinter? {
+        lock.lock()
+        if connections[profile.id] === old { connections[profile.id] = nil }
+        lock.unlock()
+        try? await old.close()
+        for attempt in 0..<3 {
+            if attempt > 0 { try? await Task.sleep(nanoseconds: 1_500_000_000) }
+            let printer = StarPrinter(Self.connectionSettings(for: profile))
+            do {
+                try await printer.open()
+                lock.lock(); connections[profile.id] = printer; lock.unlock()
+                return printer
+            } catch {
+                Logger.shared.log("star", "reopen-failed", ["id": profile.id, "attempt": attempt + 1, "error": "\(error)"])
+            }
+        }
+        return nil
+    }
+
+    /// Oublie (et ferme) les sessions Bluetooth/USB de l'accessoire `identifier` (n° de série MFi).
+    private func dropSessions(identifier: String) {
+        lock.lock()
+        let stale = connections.filter { _, value in
+            guard let p = value as? StarPrinter else { return false }
+            let s = p.connectionSettings
+            return s.interfaceType != .lan && s.identifier == identifier
+        }
+        for id in stale.keys { connections[id] = nil }
+        lock.unlock()
+        for (id, value) in stale {
+            Logger.shared.log("star", "accessory-disconnected", ["id": id])
+            if let p = value as? StarPrinter { Task { try? await p.close() } }
+        }
     }
 
     private static func connectionSettings(for profile: PrinterProfile) -> StarConnectionSettings {

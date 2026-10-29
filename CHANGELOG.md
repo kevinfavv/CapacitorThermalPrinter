@@ -4,6 +4,18 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [8.5.4]
+
+### Corrigé
+- **iOS Star Bluetooth/USB : plus aucune impression après un redémarrage de l'imprimante.**
+  Éteinte puis rallumée, une Star MFi (ex. TSP143IIIBI) revient avec une nouvelle session iOS ;
+  l'ancien `StarPrinter` restait ouvert mais ne répondait plus (« Request timed out » puis
+  « Initialize failed » à chaque job) tant que l'app n'était pas relancée. La session est
+  désormais oubliée dès qu'iOS signale la déconnexion de l'accessoire, et un job qui échoue sur
+  une erreur de session (communication, ou `unprintable` sans statut) rouvre une connexion
+  neuve et est renvoyé une fois. Papier/capot (statut connu) : pas de renvoi. Validé sur
+  iPhone avec une TSP143IIIBI.
+
 ## [8.5.3]
 
 ### Ajouté
