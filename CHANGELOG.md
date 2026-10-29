@@ -4,7 +4,7 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
-## [8.6.0]
+## [8.5.3]
 
 ### Ajouté
 - **iOS : scan réseau TCP 9100 du /24 courant** (miroir du `TcpScanner` Android), en plus de

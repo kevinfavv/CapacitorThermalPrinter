@@ -781,7 +781,7 @@ catch (e) {
 - ✅ **MFi manufacturer SDKs** (Epson/Star/Brother/Zebra) for Bluetooth/MFi. ✅📱 **Epson verified
   on iPhone** over Bluetooth (MFi). Requires the brand's MFi protocol string in `Info.plist`.
 - ✅ **Wi-Fi / Ethernet TCP** (port 9100) via `Network.framework` → triggers the **Local Network**
-  prompt. Discovery = Bonjour **+ a TCP 9100 scan of the current /24** (since 8.6.0, like
+  prompt. Discovery = Bonjour **+ a TCP 9100 scan of the current /24** (since 8.5.3, like
   Android), so generic ESC/POS printers that publish no mDNS service (TP85H-V, Xprinter…) show up.
   ✅📱 **verified on iPhone** (TP85H-V over Ethernet).
 - ✅ **Epson USB (MFi)** via the ePOS2 SDK — only for Epson models certified to connect to an
