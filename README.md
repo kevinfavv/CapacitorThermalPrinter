@@ -783,6 +783,7 @@ catch (e) {
 - ✅ **Wi-Fi / Ethernet TCP** (port 9100) via `Network.framework` → triggers the **Local Network**
   prompt. Discovery = Bonjour **+ a TCP 9100 scan of the current /24** (since 8.6.0, like
   Android), so generic ESC/POS printers that publish no mDNS service (TP85H-V, Xprinter…) show up.
+  ✅📱 **verified on iPhone** (TP85H-V over Ethernet).
 - ✅ **Epson USB (MFi)** via the ePOS2 SDK — only for Epson models certified to connect to an
   iPhone/iPad over USB (typically the USB-C ones, e.g. TM-m30II/III). Same `com.epson.escpos`
   protocol string as Bluetooth. A non-MFi USB printer (e.g. TM-T20II over USB-B) is invisible

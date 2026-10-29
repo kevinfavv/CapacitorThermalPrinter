@@ -10,7 +10,8 @@ Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 - **iOS : scan réseau TCP 9100 du /24 courant** (miroir du `TcpScanner` Android), en plus de
   Bonjour. Les imprimantes ESC/POS génériques qui ne publient aucun service mDNS (TP85H-V,
   Xprinter…) restaient introuvables sur iPhone/iPad en Wi-Fi/Ethernet. Respecte `networkCidr`
-  et `tcpPorts` ; source `tcp`.
+  et `tcpPorts` ; source `tcp`. Validé sur iPhone avec une TP85H-V en Ethernet (trouvée en
+  ~1,7 s, ticket image identique).
 - **iOS BLE : contrôle de flux par crédits** (puces Jieli, TP85H-V) : abonnement à `FF03`,
   un paquet envoyé par crédit reçu (`01 n`), taille de paquet annoncée (`02 lo hi`). Repli
   automatique sur l'ancien pacing si l'imprimante n'envoie aucun crédit.
