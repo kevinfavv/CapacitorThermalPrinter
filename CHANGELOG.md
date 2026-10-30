@@ -4,6 +4,18 @@ Toutes les modifications notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/) et
 [SemVer](https://semver.org/lang/fr/).
 
+## [8.5.5]
+
+### Corrigé
+- **Android Bluetooth : une imprimante qui ne répond pas au statut bloquait toute la file.**
+  `BluetoothSocket` n'a pas de `soTimeout` : la lecture du statut ESC/POS (`DLE EOT`)
+  attendait indéfiniment sur une imprimante muette (InnerPrinter Sunmi, Star TSP100). Le job
+  ne passait jamais `completed`, le verrou de l'imprimante restait pris et chaque impression
+  suivante restait en `pending`. La lecture SPP attend désormais au plus son timeout.
+- **Android : job `completed` dès l'envoi**, avant la lecture du statut post-impression
+  (informative). Le chargement côté app se relâche sans attendre le timeout de lecture.
+  Mesuré sur Sunmi V2 : 2,1 à 2,5 s de l'appel à `completed`, contre un blocage permanent.
+
 ## [8.5.4]
 
 ### Corrigé
