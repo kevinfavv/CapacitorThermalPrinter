@@ -370,9 +370,11 @@ class ThermalPrinterEngine(private val context: Context) {
                     resized.recycle()
                 }
 
-                val status = runCatching { adapter.getStatus(profile) }.getOrNull()
                 val duration = System.currentTimeMillis() - started
+                // Terminé dès l'envoi : le statut qui suit n'est qu'informatif, et une imprimante
+                // qui n'y répond pas (InnerPrinter Sunmi) retiendrait l'UI jusqu'au timeout de lecture.
                 emitJob(jobId, profile.id, "completed", progress = 1.0)
+                val status = runCatching { adapter.getStatus(profile) }.getOrNull()
                 Logger.log("print", "done", mapOf("id" to profile.id, "bytes" to bytes, "ms" to duration))
                 return PrintOutcome(profile.id, profile.adapter, jobId, "completed", bytes, duration, status)
             }
@@ -432,9 +434,11 @@ class ThermalPrinterEngine(private val context: Context) {
                     runCatching { adapter.disconnect(profile.id) }
                     throw e
                 }
-                val status = runCatching { adapter.getStatus(profile) }.getOrNull()
                 val duration = System.currentTimeMillis() - started
+                // Terminé dès l'envoi : le statut qui suit n'est qu'informatif, et une imprimante
+                // qui n'y répond pas (InnerPrinter Sunmi) retiendrait l'UI jusqu'au timeout de lecture.
                 emitJob(jobId, profile.id, "completed", progress = 1.0)
+                val status = runCatching { adapter.getStatus(profile) }.getOrNull()
                 Logger.log("print", "text done", mapOf("id" to profile.id, "items" to req.items.size, "bytes" to bytes))
                 return PrintOutcome(profile.id, profile.adapter, jobId, "completed", bytes, duration, status)
             }
