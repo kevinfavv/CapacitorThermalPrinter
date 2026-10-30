@@ -114,7 +114,7 @@ class BluetoothSppTransport(
 
     override fun read(buffer: ByteArray, timeoutMs: Long): Int {
         val i = input ?: return -1
-        return try { i.read(buffer) } catch (e: Exception) { -1 }
+        return readWithTimeout(i, buffer, timeoutMs)
     }
 
     override fun close() {
@@ -127,6 +127,19 @@ class BluetoothSppTransport(
 
     companion object {
         val SPP_UUID: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+        /**
+         * `BluetoothSocket` n'a pas de `soTimeout` : un `read()` nu bloque indéfiniment sur
+         * une imprimante qui ne répond pas au statut ESC/POS (ex. Star TSP100), et gèle toute
+         * la file d'impression derrière lui. On attend donc des octets disponibles.
+         */
+        fun readWithTimeout(input: InputStream, buffer: ByteArray, timeoutMs: Long): Int = try {
+            val deadline = System.currentTimeMillis() + timeoutMs
+            while (input.available() == 0 && System.currentTimeMillis() < deadline) Thread.sleep(20)
+            if (input.available() == 0) -1 else input.read(buffer)
+        } catch (e: Exception) {
+            -1
+        }
 
         /** Laisse le temps de lire et saisir le PIN dans la pop-up d'appairage. */
         const val PAIRING_TIMEOUT_MS = 30_000L
